@@ -105,84 +105,86 @@ public class MarketDataService {
 
     public void fetchRealMarketData() {
         try {
-            fetchBinanceKlines("BTCUSD", "BTCUSDT", 1.0);
             fetchBinanceKlines("XAUUSD", "PAXGUSDT", 1.00226);
             fetchBinanceKlines("EURUSD", "EURUSDT", 1.0);
             fetchBinanceKlines("GBPUSD", "GBPUSDT", 1.0);
+            fetchBinanceKlines("BTCUSD", "BTCUSDT", 1.0);
         } catch (Exception ignored) {}
     }
 
     private void fetchBinanceKlines(String internalSymbol, String binanceSymbol, double multiplier) {
         for (String tf : SUPPORTED_TIMEFRAMES) {
-            try {
-                String binanceInterval = switch (tf) {
-                    case "3m" -> "3m";
-                    case "5m" -> "5m";
-                    case "15m" -> "15m";
-                    case "30m" -> "30m";
-                    case "1h" -> "1h";
-                    case "4h" -> "4h";
-                    case "1d" -> "1d";
-                    default -> "1m";
-                };
+            CompletableFuture.runAsync(() -> {
+                try {
+                    String binanceInterval = switch (tf) {
+                        case "3m" -> "3m";
+                        case "5m" -> "5m";
+                        case "15m" -> "15m";
+                        case "30m" -> "30m";
+                        case "1h" -> "1h";
+                        case "4h" -> "4h";
+                        case "1d" -> "1d";
+                        default -> "1m";
+                    };
 
-                String url = "https://api.binance.com/api/v3/klines?symbol=" + binanceSymbol + "&interval=" + binanceInterval + "&limit=350";
-                HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(Duration.ofSeconds(4))
-                        .GET()
-                        .build();
+                    String url = "https://api.binance.com/api/v3/klines?symbol=" + binanceSymbol + "&interval=" + binanceInterval + "&limit=350";
+                    HttpRequest request = HttpRequest.newBuilder()
+                            .uri(URI.create(url))
+                            .timeout(Duration.ofSeconds(3))
+                            .GET()
+                            .build();
 
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (response.statusCode() == 200) {
-                    JsonNode array = objectMapper.readTree(response.body());
-                    if (array.isArray() && array.size() > 10) {
-                        List<Candle> liveList = new ArrayList<>();
-                        for (JsonNode item : array) {
-                            long ts = item.get(0).asLong();
-                            double open = item.get(1).asDouble() * multiplier;
-                            double high = item.get(2).asDouble() * multiplier;
-                            double low = item.get(3).asDouble() * multiplier;
-                            double close = item.get(4).asDouble() * multiplier;
-                            double vol = item.get(5).asDouble();
+                    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                    if (response.statusCode() == 200) {
+                        JsonNode array = objectMapper.readTree(response.body());
+                        if (array.isArray() && array.size() > 10) {
+                            List<Candle> liveList = new ArrayList<>();
+                            for (JsonNode item : array) {
+                                long ts = item.get(0).asLong();
+                                double open = item.get(1).asDouble() * multiplier;
+                                double high = item.get(2).asDouble() * multiplier;
+                                double low = item.get(3).asDouble() * multiplier;
+                                double close = item.get(4).asDouble() * multiplier;
+                                double vol = item.get(5).asDouble();
 
-                            liveList.add(new Candle(ts, round(open, 5), round(high, 5), round(low, 5), round(close, 5), round(vol, 2)));
-                        }
+                                liveList.add(new Candle(ts, round(open, 5), round(high, 5), round(low, 5), round(close, 5), round(vol, 2)));
+                            }
 
-                        // ⚡ Real-Time Forward Fill: Ensure candles always reach 100% live current time
-                        long now = System.currentTimeMillis();
-                        long interval = getIntervalMs(tf);
-                        if (!liveList.isEmpty()) {
-                            Candle last = liveList.get(liveList.size() - 1);
-                            long lastTs = last.getTimestamp();
-                            while (now - lastTs >= interval && (now - lastTs < 24 * 3600 * 1000L)) {
-                                lastTs += interval;
-                                double prevClose = last.getClose();
-                                double step = getVolatilityStep(internalSymbol);
-                                double delta = (random.nextDouble() - 0.495) * step * 0.15;
-                                double nextClose = round(prevClose + delta, 5);
-                                last = new Candle(
-                                        lastTs,
-                                        prevClose,
-                                        Math.max(prevClose, nextClose),
-                                        Math.min(prevClose, nextClose),
-                                        nextClose,
-                                        100.0
-                                );
-                                liveList.add(last);
-                                if (liveList.size() > 500) liveList.remove(0);
+                            // ⚡ Real-Time Forward Fill: Ensure candles always reach 100% live current time
+                            long now = System.currentTimeMillis();
+                            long interval = getIntervalMs(tf);
+                            if (!liveList.isEmpty()) {
+                                Candle last = liveList.get(liveList.size() - 1);
+                                long lastTs = last.getTimestamp();
+                                while (now - lastTs >= interval && (now - lastTs < 24 * 3600 * 1000L)) {
+                                    lastTs += interval;
+                                    double prevClose = last.getClose();
+                                    double step = getVolatilityStep(internalSymbol);
+                                    double delta = (random.nextDouble() - 0.495) * step * 0.15;
+                                    double nextClose = round(prevClose + delta, 5);
+                                    last = new Candle(
+                                            lastTs,
+                                            prevClose,
+                                            Math.max(prevClose, nextClose),
+                                            Math.min(prevClose, nextClose),
+                                            nextClose,
+                                            100.0
+                                    );
+                                    liveList.add(last);
+                                    if (liveList.size() > 500) liveList.remove(0);
+                                }
+                            }
+
+                            candleData.get(internalSymbol).put(tf, liveList);
+
+                            if ("1m".equals(tf) && !liveList.isEmpty()) {
+                                double lastClose = liveList.get(liveList.size() - 1).getClose();
+                                currentPrices.put(internalSymbol, lastClose);
                             }
                         }
-
-                        candleData.get(internalSymbol).put(tf, liveList);
-
-                        if ("1m".equals(tf) && !liveList.isEmpty()) {
-                            double lastClose = liveList.get(liveList.size() - 1).getClose();
-                            currentPrices.put(internalSymbol, lastClose);
-                        }
                     }
-                }
-            } catch (Exception ignored) {}
+                } catch (Exception ignored) {}
+            });
         }
     }
 

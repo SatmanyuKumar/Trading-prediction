@@ -1846,6 +1846,13 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchSuggestions();
     connectWebSocket();
 
+    // Fast initial re-sync after 800ms to guarantee live data without pair switching
+    setTimeout(() => {
+        loadAnalysis();
+        fetchRadarData();
+        fetchSuggestions();
+    }, 800);
+
     setInterval(() => {
         loadAnalysis();
         fetchRadarData();
