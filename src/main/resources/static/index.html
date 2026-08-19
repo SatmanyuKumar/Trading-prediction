@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Forex &amp; SMC Trading Terminal | Institutional Precision &amp; Backtesting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/terminal.css">
+    <!-- TradingView Platform Script -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body class="dark-theme">
+    <!-- Top Navigation & Live Ticker Strip -->
+    <header class="terminal-header">
+        <div class="brand-section">
+            <div class="brand-logo">
+                <span class="logo-icon">⚡</span>
+                <div class="logo-text">
+                    <span class="logo-title">PRO SMC TERMINAL</span>
+                    <span class="logo-subtitle">Institutional Order Flow &amp; Vantage MT5 Bridge</span>
+                </div>
+            </div>
+            
+            <div class="header-action-pills">
+                <a href="/Trading_Terminal_Engineering_Whitepaper.pdf" target="_blank" download="Trading_Terminal_Engineering_Whitepaper.pdf" class="backtest-header-pill" title="Download Complete Engineering Whitepaper PDF (Concepts, Architecture & Problem Solving Documentation)" style="text-decoration: none; color: inherit;">
+                    <span class="btn-icon">📄</span>
+                    <span class="btn-text">Engineering Whitepaper (PDF)</span>
+                </a>
+
+                <button class="backtest-header-pill" id="btn-open-backtest-modal" title="Run institutional backtest over historical candles">
+                    <span class="btn-icon">📊</span>
+                    <span class="btn-text">Strategy Backtest Engine</span>
+                </button>
+
+                <button class="backtest-header-pill" id="btn-open-radar-modal" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(5, 150, 105, 0.35) 100%); border-color: rgba(16, 185, 129, 0.45); color: #34d399;" title="View all live predicted future setups strictly filtered for >= 1:3.0 Risk-to-Reward">
+                    <span class="btn-icon">🎯</span>
+                    <span class="btn-text">1:3+ Setup Radar (<span id="radar-live-count">0</span>)</span>
+                </button>
+
+                <div class="broker-status-pill" id="btn-open-vantage-modal" title="Click to view or configure your Vantage MT5 Demo connection">
+                    <span class="broker-icon">🏛️</span>
+                    <span class="broker-name" id="vantage-status-text">VANTAGE MT5: CONNECT</span>
+                    <span class="broker-dot pulse-dot" id="vantage-status-dot"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="market-ticker-strip" id="ticker-strip">
+            <div class="ticker-item active" data-pair="XAUUSD" data-tv="OANDA:XAUUSD">
+                <span class="ticker-symbol">XAU/USD</span>
+                <span class="ticker-price" id="tick-XAUUSD">Gold Spot</span>
+                <span class="ticker-change up">Live</span>
+            </div>
+            <div class="ticker-item" data-pair="EURUSD" data-tv="FX:EURUSD">
+                <span class="ticker-symbol">EUR/USD</span>
+                <span class="ticker-price" id="tick-EURUSD">Euro</span>
+                <span class="ticker-change up">Live</span>
+            </div>
+            <div class="ticker-item" data-pair="GBPUSD" data-tv="FX:GBPUSD">
+                <span class="ticker-symbol">GBP/USD</span>
+                <span class="ticker-price" id="tick-GBPUSD">Pound</span>
+                <span class="ticker-change up">Live</span>
+            </div>
+            <div class="ticker-item" data-pair="USDJPY" data-tv="FX:USDJPY">
+                <span class="ticker-symbol">USD/JPY</span>
+                <span class="ticker-price" id="tick-USDJPY">Yen</span>
+                <span class="ticker-change up">Live</span>
+            </div>
+            <div class="ticker-item" data-pair="BTCUSD" data-tv="BINANCE:BTCUSDT">
+                <span class="ticker-symbol">BTC/USD</span>
+                <span class="ticker-price" id="tick-BTCUSD">Bitcoin</span>
+                <span class="ticker-change up">Live</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="terminal-workspace">
+        
+        <!-- Left: Main Chart Area & Controls -->
+        <section class="chart-section">
+            
+            <!-- Toolbar: Pair Selector, Timeframes, and View Mode -->
+            <div class="chart-toolbar">
+                <div class="tool-group pair-group" id="pair-selector">
+                    <button class="tool-btn active" data-pair="XAUUSD" data-tv="OANDA:XAUUSD"><span class="btn-icon">🪙</span> XAU/USD (Gold)</button>
+                    <button class="tool-btn" data-pair="EURUSD" data-tv="FX:EURUSD"><span class="btn-icon">💶</span> EUR/USD</button>
+                    <button class="tool-btn" data-pair="GBPUSD" data-tv="FX:GBPUSD"><span class="btn-icon">💷</span> GBP/USD</button>
+                    <button class="tool-btn" data-pair="USDJPY" data-tv="FX:USDJPY"><span class="btn-icon">💴</span> USD/JPY</button>
+                    <button class="tool-btn" data-pair="BTCUSD" data-tv="BINANCE:BTCUSDT"><span class="btn-icon">₿</span> BTC/USD</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="tool-group tf-group" id="tf-selector">
+                    <button class="tf-btn active" data-tf="1m" title="1 Minute (Micro Scalp)">1m</button>
+                    <button class="tf-btn" data-tf="3m" title="3 Minutes (Fast Momentum)">3m</button>
+                    <button class="tf-btn" data-tf="5m" title="5 Minutes (Intraday Momentum)">5m</button>
+                    <button class="tf-btn" data-tf="15m" title="15 Minutes (High Structural Reliability)">15m</button>
+                    <button class="tf-btn" data-tf="30m" title="30 Minutes (Intraday Trend)">30m</button>
+                    <button class="tf-btn" data-tf="1h" title="1 Hour (Institutional Trend)">1h</button>
+                    <button class="tf-btn" data-tf="4h" title="4 Hours (Macro Structure Anchor)">4h</button>
+                    <button class="tf-btn" data-tf="1d" title="Daily (Maximum Institutional Anchor)">1D</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="tool-group trade-mode-group" id="trade-mode-selector">
+                    <button class="trade-mode-btn active" id="btn-mode-scalp" data-tmode="SCALP" title="Fast momentum, micro FVG taps, tight 1.2x ATR stop loss (1:2.2 R:R)">⚡ Scalp Mode</button>
+                    <button class="trade-mode-btn" id="btn-mode-swing" data-tmode="SWING" title="Macro Order Blocks, wide structural 2.5x ATR buffer (1:4.5+ R:R)">🌊 Swing Mode</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="tool-group view-mode-group">
+                    <button id="btn-mode-smc" class="view-btn active" title="Smooth interactive chart with live FVG/OB/SR overlays">⚡ Smooth SMC Chart</button>
+                    <button id="btn-mode-tv" class="view-btn" title="Switches to official TradingView widget">📈 TradingView Platform</button>
+                </div>
+            </div>
+
+            <!-- Interactive SMC Checkboxes Bar -->
+            <div class="indicators-checkbox-bar">
+                <span class="checkbox-bar-label">📊 Overlays:</span>
+                
+                <label class="smc-checkbox-item" title="Draws nearest untouched Fair Value Gap boxes with 50% midpoint line directly on the chart">
+                    <input type="checkbox" id="chk-fvg" checked>
+                    <span class="custom-check fvg-badge"></span>
+                    <span class="check-text">FVG (50% C.E.)</span>
+                </label>
+
+                <label class="smc-checkbox-item" title="Draws institutional Order Block demand/supply boxes directly on the chart">
+                    <input type="checkbox" id="chk-ob" checked>
+                    <span class="custom-check ob-badge"></span>
+                    <span class="check-text">Order Blocks (OB)</span>
+                </label>
+
+                <label class="smc-checkbox-item" title="Draws Support & Resistance horizontal lines on the chart">
+                    <input type="checkbox" id="chk-sr" checked>
+                    <span class="custom-check sr-badge"></span>
+                    <span class="check-text">Support / Resistance</span>
+                </label>
+
+                <label class="smc-checkbox-item" title="Draws Break of Structure breakout lines on the chart">
+                    <input type="checkbox" id="chk-bos" checked>
+                    <span class="custom-check bos-badge"></span>
+                    <span class="check-text">Structure (BOS)</span>
+                </label>
+
+                <label class="smc-checkbox-item" title="Draws 20, 50, 200 Exponential Moving Average lines on the chart">
+                    <input type="checkbox" id="chk-ema" checked>
+                    <span class="custom-check ema-badge"></span>
+                    <span class="check-text">EMAs (20/50/200)</span>
+                </label>
+
+                <label class="smc-checkbox-item" title="Draws Target Entry, Stop Loss & Take Profit boxes on the chart">
+                    <input type="checkbox" id="chk-setup" checked>
+                    <span class="custom-check setup-badge"></span>
+                    <span class="check-text">SL / TP Targets</span>
+                </label>
+
+                <!-- Dynamic Trailing SL Checkbox -->
+                <label class="smc-checkbox-item trailing-sl-item" title="Dynamic Trailing SL: Automatically moves Stop Loss to Break-Even at 1:1 R:R (50% to TP) and trails candle swing pivots">
+                    <input type="checkbox" id="chk-trailing-sl" checked>
+                    <span class="custom-check trailing-badge"></span>
+                    <span class="check-text">🛡️ Trailing SL (Break-Even)</span>
+                </label>
+            </div>
+
+            <!-- Live Bar Stats Header -->
+            <div class="chart-stats-bar" id="stats-bar">
+                <div class="stat-item"><span class="stat-label">ASSET:</span> <span id="stat-pair" class="stat-val bold">XAUUSD</span></div>
+                <div class="stat-item"><span class="stat-label">LIVE:</span> <span id="stat-price" class="stat-val mono bold text-glow">--</span></div>
+                <div class="stat-item"><span class="stat-label">OPEN:</span> <span id="stat-open" class="stat-val mono">--</span></div>
+                <div class="stat-item"><span class="stat-label">HIGH:</span> <span id="stat-high" class="stat-val mono text-up">--</span></div>
+                <div class="stat-item"><span class="stat-label">LOW:</span> <span id="stat-low" class="stat-val mono text-down">--</span></div>
+                <div class="stat-item"><span class="stat-label">SPREAD:</span> <span id="stat-spread" class="stat-val mono highlight-spread">0.15</span></div>
+                <div class="stat-item"><span class="stat-label">24H:</span> <span id="stat-change" class="stat-val mono text-up">+0.45%</span></div>
+                <div class="chart-actions">
+                    <button id="btn-reset-zoom" title="Reset Zoom / Pan (Double-Click Chart)">🔍 Reset Zoom</button>
+                    <button id="btn-fit-screen" title="Fit Candles">↔ Auto Scale</button>
+                </div>
+            </div>
+
+            <!-- Chart Containers -->
+            <div class="canvas-container" id="chart-viewport">
+                <canvas id="tradingChart"></canvas>
+                <div id="tv_chart_container" class="hidden"></div>
+                <div id="chart-tooltip" class="chart-tooltip hidden"></div>
+
+                <!-- Floating On-Chart Controls HUD -->
+                <div class="chart-floating-controls" id="chart-floating-controls">
+                    <button id="btn-float-zoom-in" class="chart-float-btn" title="Zoom In (+)">➕</button>
+                    <button id="btn-float-zoom-out" class="chart-float-btn" title="Zoom Out (-)">➖</button>
+                    <button id="btn-float-autofit" class="chart-float-btn" title="Auto Scale / Center (Space/0)">↔️ Auto Scale</button>
+                    <button id="btn-float-reset" class="chart-float-btn" title="Reset View">🔄 Reset</button>
+                    <button id="btn-float-expand" class="chart-float-btn highlight" title="Expand Chart Height (Full View)">⛶ Expand Chart</button>
+                </div>
+            </div>
+
+            <!-- Bottom: Professional Trading Journal & Order Execution (1:1 MT5 Mirror) -->
+            <div class="paper-trading-section">
+                <!-- Section Header & Metrics Bar -->
+                <div class="paper-header">
+                    <div class="journal-tabs">
+                        <button class="journal-tab-btn active" id="tab-btn-positions">⚡ Active Positions (<span id="count-active">0</span>)</button>
+                        <button class="journal-tab-btn" id="tab-btn-history">📜 Trade History (<span id="count-history">0</span>)</button>
+                        <button class="journal-tab-btn" id="tab-btn-suggestions">🧠 AI Setup History (<span id="count-suggestions">0</span>)</button>
+                    </div>
+
+                    <div class="paper-metrics-bar">
+                        <!-- Dynamic Balance Pill: Shows Vantage Broker Balance in Vantage Mode -->
+                        <div class="metric-pill balance-pill" id="btn-open-balance-modal" title="Click to view account status or customize balance">
+                            <span class="m-label" id="account-label">Vantage Balance:</span>
+                            <span class="m-val highlight-cyan" id="journal-balance">$99,878.00</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="m-label">Floating P&amp;L:</span>
+                            <span class="m-val pnl-val" id="total-floating-pnl">$0.00</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="m-label">Realized P&amp;L:</span>
+                            <span class="m-val" id="total-realized-pnl">$0.00</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="m-label">Win Rate:</span>
+                            <span class="m-val" id="journal-winrate">--%</span>
+                        </div>
+                    </div>
+
+                    <!-- Clean Journal Management Tools in Header -->
+                    <div class="history-actions-group" id="history-actions-group">
+                        <button id="btn-expand-journal" class="btn-journal-secondary" style="background:rgba(56, 189, 248, 0.12); border-color:#38bdf8; color:#38bdf8; font-weight:700;" title="Maximize table view to see all history rows at once">
+                            ⛶ Maximize View
+                        </button>
+                        <a href="/api/orders/export/csv" download="trading_journal_history.csv" class="btn-journal-export" id="btn-export-csv" title="Download your persistent trade history as an Excel/CSV spreadsheet">
+                            📥 CSV
+                        </a>
+                        <button id="btn-clear-history" class="btn-journal-danger" title="Deletes all closed trade records from history">
+                            🗑️ Clear History
+                        </button>
+                        <button id="btn-clear-ai-history" class="btn-journal-danger" style="background:rgba(239, 68, 68, 0.25); border-color:#ef4444; color:#fca5a5;" title="Deletes and resets all past AI Setup recommendations">
+                            🗑️ Clean AI History
+                        </button>
+                        <button id="btn-clean-all-history" class="btn-journal-danger" style="background:linear-gradient(135deg, rgba(220, 38, 38, 0.3) 0%, rgba(185, 28, 28, 0.45) 100%); border:1px solid #ef4444; color:#ffffff; font-weight:800; box-shadow:0 2px 8px rgba(239,68,68,0.3);" title="1-Click Master Reset: Cleans and wipes ALL Trade History, Active Orders, and AI Setup History">
+                            🧹 Clean ALL History
+                        </button>
+                        <button id="btn-reset-all" class="btn-journal-secondary" title="Clears all trades and syncs live with MT5">
+                            🔄 Sync MT5
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Quick Order Controls with FULL CUSTOM LOT SIZE -->
+                <div class="paper-controls">
+                    <!-- Fully Customizable Lot Input (Default 0.10 Mini for Safe Risk) -->
+                    <div class="custom-lot-section">
+                        <label class="lot-label">Lot Size:</label>
+                        <div class="lot-input-wrapper">
+                            <button id="btn-lot-minus" class="lot-stepper-btn" title="Decrease Lot">-</button>
+                            <input type="number" id="order-lots" class="custom-lot-input" value="0.10" min="0.01" max="100.0" step="0.01">
+                            <button id="btn-lot-plus" class="lot-stepper-btn" title="Increase Lot">+</button>
+                        </div>
+                        
+                        <!-- Quick Lot Presets -->
+                        <div class="lot-presets">
+                            <button class="lot-chip" data-lot="0.01">0.01</button>
+                            <button class="lot-chip active" data-lot="0.10">0.10</button>
+                            <button class="lot-chip" data-lot="0.50">0.50</button>
+                            <button class="lot-chip" data-lot="1.00">1.00</button>
+                            <button class="lot-chip" data-lot="5.00">5.00</button>
+                        </div>
+
+                        <span class="pip-val-tag" id="pip-value-tag">Pip Val: ~$1.00</span>
+                    </div>
+
+                    <div class="order-btn-group">
+                        <button id="btn-quick-buy" class="action-btn buy-btn">
+                            <span class="action-title">BUY / LONG</span>
+                            <span class="action-sub" id="buy-ask-price">Ask: --</span>
+                        </button>
+                        <button id="btn-quick-sell" class="action-btn sell-btn">
+                            <span class="action-title">SELL / SHORT</span>
+                            <span class="action-sub" id="sell-bid-price">Bid: --</span>
+                        </button>
+                        <button id="btn-apply-setup" class="action-btn setup-auto-btn" title="Executes 1-click trade with algorithmic FVG Entry, SL and TP">
+                            <span class="action-title">⚡ Auto-Trade Setup</span>
+                            <span class="action-sub">FVG Entry, SL &amp; TP</span>
+                        </button>
+                        <button id="btn-trade-advisor" class="action-btn advisor-btn" title="AI Trade Advisor: Buy Profit vs Sell Profit comparison, Strategy Right/Wrong Verdict, and Expected Return">
+                            <span class="action-title">💡 Trade Advisor</span>
+                            <span class="action-sub">Buy vs Sell Profit Check</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table View (1:1 MT5 Positions Mirror) -->
+                <div class="positions-table-container">
+                    <table class="positions-table">
+                        <thead>
+                            <tr id="table-headers">
+                                <th>Ticket #</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Lots</th>
+                                <th>Entry Price</th>
+                                <th>Stop Loss</th>
+                                <th>Take Profit</th>
+                                <th>Current Price</th>
+                                <th>Live P&amp;L ($)</th>
+                                <th>Status</th>
+                                <th style="text-align:center;">Action / Manage</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-tbody">
+                            <tr class="empty-row">
+                                <td colspan="11">No open positions in your Vantage MT5 account.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Real-Time Trade Signal & Book Rules Explanation Panel -->
+        <aside class="analysis-sidebar">
+            
+            <!-- Live Signal Card with SPREAD-AWARE BADGE & CONFLUENCE METER -->
+            <div class="signal-card" id="signal-card">
+                <div class="signal-badge-row">
+                    <div class="signal-badge buy" id="signal-badge">BUY SIGNAL</div>
+                    <div class="spread-indicator-pill" id="spread-cost-badge">Spread: 0.15 (Included)</div>
+                    <div class="confidence-pill" id="signal-confidence">88% CONFIDENCE</div>
+                </div>
+
+                <h3 class="setup-name" id="setup-title">Institutional Bullish OTE + Untouched FVG Demand</h3>
+
+                <!-- Trade Coordinates Grid -->
+                <div class="trade-matrix">
+                    <div class="matrix-cell entry">
+                        <span class="cell-label">ENTRY (50% FVG + SPREAD)</span>
+                        <span class="cell-val" id="val-entry">--</span>
+                    </div>
+                    <div class="matrix-cell sl">
+                        <span class="cell-label">STOP LOSS (1.5× ATR BUFFER)</span>
+                        <span class="cell-val" id="val-sl">--</span>
+                    </div>
+                    <div class="matrix-cell tp">
+                        <span class="cell-label">TAKE PROFIT (TARGET)</span>
+                        <span class="cell-val" id="val-tp1">--</span>
+                    </div>
+                    <div class="matrix-cell rr">
+                        <span class="cell-label">RISK : REWARD</span>
+                        <span class="cell-val" id="val-rr">1 : 2.85</span>
+                    </div>
+                </div>
+
+                <!-- Untouched FVG & OB Zones Box -->
+                <div class="fvg-active-zones-box" id="fvg-active-zones">
+                    <h4 class="confluence-title">🎯 Nearest Untouched SMC Zones (Drawn on Chart):</h4>
+                    <div class="smc-zone-pill bull">
+                        <span class="zone-tag">🟢 Demand FVG:</span>
+                        <span class="zone-val" id="zone-bull-fvg">Calculating...</span>
+                    </div>
+                    <div class="smc-zone-pill bear">
+                        <span class="zone-tag">🔴 Supply FVG:</span>
+                        <span class="zone-val" id="zone-bear-fvg">Calculating...</span>
+                    </div>
+                </div>
+
+                <!-- Confluence Checklist -->
+                <div class="confluence-section">
+                    <h4 class="confluence-title">8-Point Institutional Confluence Checklist:</h4>
+                    <ul class="confluence-list" id="confluence-list">
+                        <li>Higher Timeframe Trend Alignment (Al Brooks 20/50 EMA Slope)</li>
+                        <li>Price trading in deep Institutional Discount / Premium (Wyckoff OTE)</li>
+                        <li>Untouched 50% Consequent Encroachment (C.E.) of FVG Imbalance</li>
+                        <li>Dynamic ATR Invalidation Buffer: Stop Loss protected past wick floor</li>
+                        <li>Minimum 1:2.85+ Asymmetric Risk-to-Reward Ratio (Mark Douglas)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Deep Textbook Strategy Explanation Card -->
+            <div class="book-explanation-card">
+                <div class="card-title-row">
+                    <span class="book-icon">📚</span>
+                    <h3 class="book-heading">Institutional Strategy &amp; Invalidation Blueprint</h3>
+                </div>
+                <div class="book-content" id="book-explanation-body">
+                    <p>Loading real-time market rationale and textbook rules...</p>
+                </div>
+            </div>
+
+            <!-- Interactive Strategy Playbook & Execution Guide -->
+            <div class="strategy-playbook-card" id="strategy-playbook-card">
+                <div class="playbook-header">
+                    <div class="playbook-title-row">
+                        <span class="playbook-icon">🧭</span>
+                        <h3 class="playbook-heading">Strategy Execution Playbook</h3>
+                    </div>
+                    <div class="playbook-tab-group">
+                        <button class="playbook-tab active" id="btn-playbook-scalp" data-playbook="SCALP">⚡ Scalp (5m)</button>
+                        <button class="playbook-tab" id="btn-playbook-swing" data-playbook="SWING">🌊 Swing (4h)</button>
+                    </div>
+                </div>
+
+                <div class="playbook-body">
+                    <div class="playbook-step" id="step-trend">
+                        <div class="step-num">1</div>
+                        <div class="step-details">
+                            <span class="step-label">HTF Trend Filter</span>
+                            <span class="step-status" id="playbook-status-trend">Checking 20/50/200 EMA...</span>
+                        </div>
+                    </div>
+
+                    <div class="playbook-step" id="step-valuation">
+                        <div class="step-num">2</div>
+                        <div class="step-details">
+                            <span class="step-label">Valuation Matrix</span>
+                            <span class="step-status" id="playbook-status-valuation">Checking Discount / Premium...</span>
+                        </div>
+                    </div>
+
+                    <div class="playbook-step" id="step-entry">
+                        <div class="step-num">3</div>
+                        <div class="step-details">
+                            <span class="step-label">50% FVG Invalidation</span>
+                            <span class="step-status" id="playbook-status-entry">Scanning Imbalance...</span>
+                        </div>
+                    </div>
+
+                    <div class="playbook-step" id="step-risk">
+                        <div class="step-num">4</div>
+                        <div class="step-details">
+                            <span class="step-label">Trailing SL Shield</span>
+                            <span class="step-status" id="playbook-status-risk">1:1 R:R Break-Even Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-playbook-trigger" id="btn-playbook-trigger">
+                    🚀 1-Click Execute Strategy Setup
+                </button>
+            </div>
+
+            <!-- Live 1:3+ Future Setup Prediction Radar Widget -->
+            <div class="strategy-playbook-card radar-sidebar-widget" id="radar-sidebar-card">
+                <div class="playbook-header">
+                    <div class="playbook-title-row" style="justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="playbook-icon">🎯</span>
+                            <h3 class="playbook-heading">1:3+ Future Setup Radar</h3>
+                        </div>
+                        <span class="radar-filter-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3);">R:R >= 1:3.0</span>
+                    </div>
+                </div>
+
+                <div class="radar-list-container" id="radar-sidebar-list">
+                    <div style="text-align: center; color: var(--text-dim); padding: 12px; font-size: 11px;">
+                        Scanning across 5 assets for >= 1:3.0 setups...
+                    </div>
+                </div>
+
+                <button class="btn-journal-secondary" id="btn-view-all-radar" style="width: 100%; padding: 7px; font-size: 11px; margin-top: 4px;">
+                    🔍 Expand Full Setup Radar &amp; Scanner
+                </button>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- HISTORICAL STRATEGY BACKTEST MODAL -->
+    <div class="modal-overlay hidden" id="backtest-modal">
+        <div class="modal-card backtest-modal-card">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon">📊</span>
+                    <h3 class="modal-title">Institutional SMC Strategy Backtesting Engine</h3>
+                </div>
+                <button class="btn-close-modal" id="btn-close-backtest-modal">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <p class="modal-desc">Run historical simulations across historical candles with realistic spread and execution slippage to verify strategy win rate and profit factor before trading live.</p>
+                
+                <div class="backtest-controls-row">
+                    <div class="backtest-input-group">
+                        <label>Asset:</label>
+                        <select id="backtest-symbol" class="modal-select">
+                            <option value="XAUUSD">XAUUSD (Gold Spot)</option>
+                            <option value="EURUSD">EURUSD (Euro)</option>
+                            <option value="GBPUSD">GBPUSD (Pound)</option>
+                            <option value="USDJPY">USDJPY (Yen)</option>
+                            <option value="BTCUSD">BTCUSD (Bitcoin)</option>
+                        </select>
+                    </div>
+
+                    <div class="backtest-input-group">
+                        <label>Timeframe:</label>
+                        <select id="backtest-timeframe" class="modal-select">
+                            <option value="1d">1D (Daily Macro Anchor - Max Reliability)</option>
+                            <option value="4h">4h (4 Hour Institutional Structure)</option>
+                            <option value="1h">1h (1 Hour Macro Trend)</option>
+                            <option value="30m">30m (30 Min Intraday Trend)</option>
+                            <option value="15m" selected>15m (15 Min High Structural Reliability)</option>
+                            <option value="5m">5m (5 Min Intraday Momentum)</option>
+                            <option value="3m">3m (3 Min Scalp)</option>
+                            <option value="1m">1m (1 Min Micro Scalp)</option>
+                        </select>
+                    </div>
+
+                    <div class="backtest-input-group">
+                        <label>Strategy Mode:</label>
+                        <select id="backtest-mode" class="modal-select">
+                            <option value="SCALP" selected>⚡ Scalp Mode (1:2.2 R:R)</option>
+                            <option value="SWING">🌊 Swing Mode (1:4.5+ R:R)</option>
+                        </select>
+                    </div>
+
+                    <div class="backtest-input-group">
+                        <label>Candle Sample:</label>
+                        <select id="backtest-candles" class="modal-select">
+                            <option value="200">200 Candles</option>
+                            <option value="300" selected>300 Candles</option>
+                            <option value="500">500 Candles</option>
+                        </select>
+                    </div>
+
+                    <button id="btn-run-backtest" class="btn-execute-backtest">
+                        🚀 Run Empirical Backtest
+                    </button>
+                </div>
+
+                <!-- KPI Metric Cards Grid -->
+                <div class="backtest-kpi-grid" id="backtest-kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">WIN RATE %</span>
+                        <span class="kpi-val text-up" id="kpi-winrate">--%</span>
+                        <span class="kpi-sub" id="kpi-wins-losses">0 Wins / 0 Losses</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <span class="kpi-label">PROFIT FACTOR</span>
+                        <span class="kpi-val highlight-cyan" id="kpi-profit-factor">--</span>
+                        <span class="kpi-sub">Gross Profit / Gross Loss</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <span class="kpi-label">TOTAL NET PROFIT</span>
+                        <span class="kpi-val text-up" id="kpi-net-profit">$0.00</span>
+                        <span class="kpi-sub" id="kpi-return-pct">+0.00% Return</span>
+                    </div>
+
+                    <div class="kpi-card">
+                        <span class="kpi-label">MAX DRAWDOWN</span>
+                        <span class="kpi-val text-down" id="kpi-max-dd">--%</span>
+                        <span class="kpi-sub">Risk Contained</span>
+                    </div>
+                </div>
+
+                <!-- Historical Trade Log Table -->
+                <div class="backtest-log-section">
+                    <h4 class="backtest-log-title">Historical Trade-by-Trade Execution Log:</h4>
+                    <div class="backtest-table-wrap">
+                        <table class="backtest-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Type</th>
+                                    <th>Entry Price</th>
+                                    <th>Exit Price</th>
+                                    <th>Stop Loss</th>
+                                    <th>Take Profit</th>
+                                    <th>Result</th>
+                                    <th>Net P&amp;L ($)</th>
+                                    <th>Account Capital</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backtest-tbody">
+                                <tr>
+                                    <td colspan="9" style="text-align:center; padding: 18px; color: var(--text-dim);">
+                                        Click "Run Empirical Backtest" above to simulate historical performance.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VANTAGE MT5 INTEGRATION MODAL -->
+    <div class="modal-overlay hidden" id="vantage-modal">
+        <div class="modal-card vantage-modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🏛️ Vantage MT5 Demo Account Connection</h3>
+                <button class="btn-close-modal" id="btn-close-vantage-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Connect your <strong>Vantage MetaTrader 5 Demo account</strong> to sync live balance, margin, and execute trades directly into your Vantage MT5 account.</p>
+                
+                <div class="vantage-form-group">
+                    <label>Vantage MT5 Server:</label>
+                    <select id="vantage-server-select" class="modal-select">
+                        <option value="VantageMarkets-Demo">VantageMarkets-Demo</option>
+                        <option value="VantageInternational-Demo">VantageInternational-Demo</option>
+                        <option value="VantageFX-Demo">VantageFX-Demo</option>
+                        <option value="VantageGlobal-Demo">VantageGlobal-Demo</option>
+                    </select>
+                </div>
+
+                <div class="vantage-form-group">
+                    <label>Vantage Account Number:</label>
+                    <input type="text" id="input-vantage-account" class="modal-input-field" placeholder="e.g. 25951798" value="25951798">
+                </div>
+
+                <div class="vantage-broker-balance-note">
+                    <span>💡 <strong>Broker Balance Sync:</strong> Your real Vantage balance &amp; margin are automatically retrieved live from your MT5 terminal.</span>
+                </div>
+
+                <div class="vantage-bridge-guide-box">
+                    <div class="guide-header">
+                        <span class="guide-icon">🔌</span>
+                        <strong>Live MT5 Auto-Execution Socket (v1.40 SL/TP Enabled)</strong>
+                    </div>
+                    <p class="guide-text">
+                        Orders placed from this terminal will execute in Vantage MT5 with exact Stop Loss &amp; Take Profit.
+                    </p>
+                    <div class="guide-steps">
+                        <span>1. Download our updated bridge EA below.</span>
+                        <span>2. Place it in your MT5 <code>MQL5/Experts</code> folder and compile (<code>F4</code> &rarr; <code>F7</code>).</span>
+                        <span>3. Drag onto your chart and ensure <strong>Allow Algo Trading</strong> is enabled.</span>
+                    </div>
+                    <a href="mql5/VantageTerminalBridge.mq5" download class="btn-download-ea">⬇️ Download VantageTerminalBridge.mq5 (v1.40)</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="btn-cancel-vantage">Close</button>
+                <button class="btn-disconnect-vantage hidden" id="btn-disconnect-vantage">Disconnect</button>
+                <button class="btn-save-balance" id="btn-save-vantage">🔄 Re-Sync Vantage</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CAPITAL PRESERVATION / AUTO-TRADE SAFETY MODAL -->
+    <div class="modal-overlay hidden" id="safety-modal">
+        <div class="modal-card safety-modal-card">
+            <div class="modal-header safety-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon safety-icon">🛡️</span>
+                    <h3 class="modal-title" id="safety-modal-title">Capital Preservation Shield Active</h3>
+                </div>
+                <button class="btn-close-modal" id="btn-close-safety-modal">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="safety-warning-banner">
+                    <span class="warning-tag">⚠️ TRADE EXECUTION BLOCKED</span>
+                    <p id="safety-modal-reason">
+                        Market is currently consolidating in a low-probability choppy range without institutional displacement (Confidence &lt; 80%).
+                    </p>
+                </div>
+
+                <div class="safety-details-grid">
+                    <div class="safety-stat-item">
+                        <span class="s-label">Market State:</span>
+                        <span class="s-val text-down" id="safety-market-state">Choppy Consolidation</span>
+                    </div>
+                    <div class="safety-stat-item">
+                        <span class="s-label">Strategy Score:</span>
+                        <span class="s-val text-down" id="safety-confidence-score">45% (Below 80% Threshold)</span>
+                    </div>
+                    <div class="safety-stat-item">
+                        <span class="s-label">Safety Action:</span>
+                        <span class="s-val highlight-cyan">Capital Protected (No Margin Wasted)</span>
+                    </div>
+                </div>
+
+                <div class="safety-rule-box">
+                    <strong>📚 Mark Douglas (*Trading in the Zone*) Rule #1:</strong>
+                    <p>
+                        "Amateur traders force trades in choppy markets and blow accounts. Professional institutional traders wait patiently until the market sweeps liquidity and presents an unmitigated A+ Fair Value Gap."
+                    </p>
+                </div>
+            </div>
+
+            <div class="modal-footer safety-footer">
+                <button class="btn-safety-dismiss" id="btn-dismiss-safety">👍 Got It, Protect My Capital</button>
+                <button class="btn-safety-override" id="btn-override-safety" title="Force execute trade anyway at high risk">⚠️ Force Execute Anyway</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💡 AI TRADE ADVISOR & BUY vs SELL PROFIT COMPARISON MODAL -->
+    <div class="modal-overlay hidden" id="advisor-modal">
+        <div class="modal-card advisor-modal-card">
+            <div class="modal-header advisor-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon">💡</span>
+                    <div>
+                        <h3 class="modal-title">AI Trade Advisor &amp; Strategy Evaluator</h3>
+                        <span class="advisor-subtitle" id="advisor-sub-info">XAUUSD • 15m • ⚡ Scalp Mode • 0.10 Lots</span>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-advisor-modal">&times;</button>
+            </div>
+
+            <div class="modal-body advisor-body">
+                
+                <!-- 🎯 Strategy Verdict & Health Check Banner -->
+                <div class="advisor-verdict-banner" id="advisor-verdict-banner">
+                    <div class="verdict-top-row">
+                        <span class="verdict-badge" id="advisor-verdict-badge">🟢 STRATEGY IS 100% RIGHT &amp; A+ GRADE</span>
+                        <span class="expectancy-pill" id="advisor-expectancy-pill">💰 Mathematical Edge: +$185.00 / Trade</span>
+                    </div>
+                    <p class="verdict-explanation" id="advisor-verdict-text">
+                        Price is strictly respecting Higher-Timeframe trend and trading in institutional discount with untouched 50% FVG demand.
+                    </p>
+                </div>
+
+                <!-- ⚖️ BUY vs SELL PROFIT & RISK SIDE-BY-SIDE MATRIX -->
+                <div class="advisor-comparison-grid">
+                    
+                    <!-- 🟢 BUY SCENARIO COLUMN -->
+                    <div class="advisor-scenario-card buy-scenario" id="card-buy-scenario">
+                        <div class="scenario-header">
+                            <div class="scenario-title-group">
+                                <span class="scenario-pill buy-pill">🟢 BUY / LONG</span>
+                                <span class="recommended-tag hidden" id="tag-buy-recommended">⭐ BEST CHOICE</span>
+                            </div>
+                            <span class="scenario-winprob" id="buy-winprob-text">88% Win Prob</span>
+                        </div>
+
+                        <!-- Progress Meter -->
+                        <div class="winprob-meter-bg">
+                            <div class="winprob-meter-bar buy-bar" id="buy-meter-bar" style="width: 88%;"></div>
+                        </div>
+
+                        <!-- Profit vs Risk Matrix -->
+                        <div class="scenario-metrics-grid">
+                            <div class="s-metric-item">
+                                <span class="sm-label">🎯 Projected Profit:</span>
+                                <span class="sm-val text-up" id="buy-profit-val">+$245.00 (+24.5 pips)</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">🛡️ Potential Risk (SL):</span>
+                                <span class="sm-val text-down" id="buy-risk-val">-$98.00 (-9.8 pips)</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">⚖️ Risk-to-Reward:</span>
+                                <span class="sm-val mono" id="buy-rr-val">1 : 2.50</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">📍 Entry Coordinate:</span>
+                                <span class="sm-val mono" id="buy-entry-val">2468.50</span>
+                            </div>
+                        </div>
+
+                        <!-- Confluences List -->
+                        <div class="scenario-confluences-box">
+                            <span class="box-title">✅ Supporting Confluences:</span>
+                            <ul class="confluence-bullets" id="buy-confluences-list">
+                                <li>Ascending EMA 20/50/200 Slope</li>
+                                <li>Deep Discount Pricing</li>
+                            </ul>
+                        </div>
+
+                        <button class="btn-execute-scenario btn-execute-buy" id="btn-advisor-execute-buy">
+                            🚀 1-Click Execute BUY (0.10 Lot)
+                        </button>
+                    </div>
+
+                    <!-- 🔴 SELL SCENARIO COLUMN -->
+                    <div class="advisor-scenario-card sell-scenario" id="card-sell-scenario">
+                        <div class="scenario-header">
+                            <div class="scenario-title-group">
+                                <span class="scenario-pill sell-pill">🔴 SELL / SHORT</span>
+                                <span class="recommended-tag hidden" id="tag-sell-recommended">⭐ BEST CHOICE</span>
+                            </div>
+                            <span class="scenario-winprob" id="sell-winprob-text">24% Win Prob</span>
+                        </div>
+
+                        <!-- Progress Meter -->
+                        <div class="winprob-meter-bg">
+                            <div class="winprob-meter-bar sell-bar" id="sell-meter-bar" style="width: 24%;"></div>
+                        </div>
+
+                        <!-- Profit vs Risk Matrix -->
+                        <div class="scenario-metrics-grid">
+                            <div class="s-metric-item">
+                                <span class="sm-label">🎯 Projected Profit:</span>
+                                <span class="sm-val text-up" id="sell-profit-val">+$110.00 (+11.0 pips)</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">🛡️ Potential Risk (SL):</span>
+                                <span class="sm-val text-down" id="sell-risk-val">-$165.00 (-16.5 pips)</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">⚖️ Risk-to-Reward:</span>
+                                <span class="sm-val mono" id="sell-rr-val">1 : 0.67</span>
+                            </div>
+                            <div class="s-metric-item">
+                                <span class="sm-label">📍 Entry Coordinate:</span>
+                                <span class="sm-val mono" id="sell-entry-val">2468.50</span>
+                            </div>
+                        </div>
+
+                        <!-- Confluences List -->
+                        <div class="scenario-confluences-box">
+                            <span class="box-title">⚠️ Warnings &amp; Risks:</span>
+                            <ul class="confluence-bullets" id="sell-confluences-list">
+                                <li>Counter to Higher-Timeframe Trend</li>
+                                <li>Selling directly into Demand FVG</li>
+                            </ul>
+                        </div>
+
+                        <button class="btn-execute-scenario btn-execute-sell" id="btn-advisor-execute-sell">
+                            🚀 1-Click Execute SELL (0.10 Lot)
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- 📚 Institutional Principle -->
+                <div class="advisor-footer-note">
+                    <strong>💡 Mark Douglas Expectancy Equation:</strong>
+                    <span>$E = (P_{\text{win}} \times \text{Profit}) - (P_{\text{loss}} \times \text{Loss})$. Only pull the trigger when Mathematical Edge ($E$) is positive and R:R $\ge 1:2.0$.</span>
+                </div>
+
+            </div>
+
+            <div class="modal-footer advisor-footer">
+                <button class="btn-cancel" id="btn-close-advisor-footer">Close Advisor</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🎯 1:3+ FUTURE SETUP RADAR & PREDICTIONS MODAL -->
+    <div class="modal-overlay hidden" id="radar-modal">
+        <div class="modal-card radar-modal-card">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <span class="modal-icon">🎯</span>
+                    <h3 class="modal-title">High-R:R (1:3.0+) Future Trade Setup Radar</h3>
+                </div>
+                <button class="btn-close-modal" id="btn-close-radar-modal">&times;</button>
+            </div>
+
+            <div class="radar-modal-filters">
+                <div class="radar-filter-tabs">
+                    <button class="radar-tab-btn active" data-filter="ALL">All 1:3+ Setups (<span id="count-radar-all">0</span>)</button>
+                    <button class="radar-tab-btn" data-filter="ACTIVE_IN_ZONE">🔥 Ready In Zone (<span id="count-radar-active">0</span>)</button>
+                    <button class="radar-tab-btn" data-filter="SCALP">⚡ Scalp (5m/15m)</button>
+                    <button class="radar-tab-btn" data-filter="SWING">🌊 Swing (1h/4h)</button>
+                </div>
+                <div class="radar-last-updated" id="radar-last-updated">Updating live...</div>
+            </div>
+
+            <div class="radar-grid" id="radar-modal-grid">
+                <!-- Dynamically populated via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/chart-engine.js?v=3.7"></script>
+    <script src="js/app.js?v=3.7"></script>
+</body>
+</html>
