@@ -360,13 +360,25 @@ class TradingChartEngine {
 
         if (candleMin === Infinity || candleMax === -Infinity) return;
 
-        // 2. TradingView-Grade Vertical Centering Formula:
-        // Add balanced 30% headroom above and 30% footroom below
-        const candleRange = Math.max(0.001, candleMax - candleMin);
-        const candleMid = (candleMin + candleMax) / 2.0;
+        // Include nearest overhead & underneath key levels into view calculation
+        let displayMax = candleMax;
+        let displayMin = candleMin;
 
-        // Total range with 60% padding (30% above highest candle, 30% below lowest candle)
-        const paddedRange = candleRange * 1.60;
+        if (this.flags && this.flags.sr && this.srs) {
+            this.srs.forEach(sr => {
+                if (sr.price > candleMax && sr.price <= candleMax * 1.25) {
+                    displayMax = Math.max(displayMax, sr.price);
+                }
+                if (sr.price < candleMin && sr.price >= candleMin * 0.85) {
+                    displayMin = Math.min(displayMin, sr.price);
+                }
+            });
+        }
+
+        const candleRange = Math.max(0.001, displayMax - displayMin);
+        const candleMid = (displayMin + displayMax) / 2.0;
+
+        const paddedRange = candleRange * 1.30;
         const effectiveHalfRange = (paddedRange / 2.0) / this.verticalScaleMultiplier;
         const centerPrice = candleMid + this.verticalOffset;
 
@@ -634,23 +646,65 @@ class TradingChartEngine {
     drawSupportResistance(ctx, chartW, priceToY) {
         this.srs.forEach(sr => {
             const y = priceToY(sr.price);
-            const isSupport = sr.type === 'SUPPORT';
+            const typeStr = (sr.type || '').toUpperCase();
 
-            ctx.strokeStyle = isSupport ? 'rgba(16, 185, 129, 0.65)' : 'rgba(244, 63, 94, 0.65)';
-            ctx.lineWidth = 1.4;
-            ctx.setLineDash([6, 4]);
+            let strokeColor = 'rgba(244, 63, 94, 0.65)';
+            let badgeBg = 'rgba(244, 63, 94, 0.22)';
+            let textColor = '#f43f5e';
+            let lineDash = [6, 4];
+            let lineWidth = 1.4;
+
+            if (typeStr.includes('FIB') || typeStr.includes('1.618') || typeStr.includes('1.272')) {
+                // Glowing Amber/Cyan Fib Extension
+                strokeColor = 'rgba(245, 158, 11, 0.85)';
+                badgeBg = 'rgba(245, 158, 11, 0.28)';
+                textColor = '#fbbf24';
+                lineDash = [7, 3];
+                lineWidth = 1.8;
+            } else if (typeStr.includes('PSYCHOLOGICAL') || typeStr.includes('INSTITUTIONAL') || typeStr.includes('5,000') || typeStr.includes('CEILING')) {
+                // Royal Purple/Blue Institutional Level
+                strokeColor = 'rgba(168, 85, 247, 0.85)';
+                badgeBg = 'rgba(168, 85, 247, 0.28)';
+                textColor = '#c084fc';
+                lineDash = [8, 4];
+                lineWidth = 1.8;
+            } else if (typeStr.includes('BSL') || typeStr.includes('SSL') || typeStr.includes('LIQUIDITY')) {
+                // Golden Aqua Liquidity Pool
+                strokeColor = 'rgba(0, 242, 254, 0.80)';
+                badgeBg = 'rgba(0, 242, 254, 0.22)';
+                textColor = '#00f2fe';
+                lineDash = [4, 4];
+                lineWidth = 1.6;
+            } else if (typeStr.includes('SUPPORT')) {
+                strokeColor = 'rgba(16, 185, 129, 0.65)';
+                badgeBg = 'rgba(16, 185, 129, 0.22)';
+                textColor = '#10b981';
+            }
+
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = lineWidth;
+            ctx.setLineDash(lineDash);
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(chartW, y);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            ctx.fillStyle = isSupport ? 'rgba(16, 185, 129, 0.22)' : 'rgba(244, 63, 94, 0.22)';
-            ctx.fillRect(chartW - 145, y - 10, 140, 20);
-            ctx.fillStyle = isSupport ? '#10b981' : '#f43f5e';
-            ctx.font = 'bold 10.5px JetBrains Mono';
+            // Dynamic Badge Size
+            const labelText = `${sr.type} (${sr.price.toFixed(2)})`;
+            ctx.font = 'bold 9.5px JetBrains Mono';
+            const textWidth = ctx.measureText(labelText).width;
+            const badgeW = Math.max(140, textWidth + 14);
+
+            ctx.fillStyle = badgeBg;
+            ctx.fillRect(chartW - badgeW - 10, y - 10, badgeW, 20);
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(chartW - badgeW - 10, y - 10, badgeW, 20);
+
+            ctx.fillStyle = textColor;
             ctx.textAlign = 'left';
-            ctx.fillText(`${sr.type} (${sr.touches} touches)`, chartW - 140, y + 4);
+            ctx.fillText(labelText, chartW - badgeW - 3, y + 4);
         });
     }
 

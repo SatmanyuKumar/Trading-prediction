@@ -33,7 +33,7 @@ public class SmcAnalysisService {
         List<MarketStructure> structures = detectMarketStructures(candles, isSwing);
         List<FairValueGap> fvgs = detectUntouchedFairValueGaps(candles, isSwing, atr14);
         List<OrderBlock> orderBlocks = detectOrderBlocks(candles, isSwing);
-        List<SupportResistance> srLevels = detectSupportResistance(candles, isSwing);
+        List<SupportResistance> srLevels = detectSupportResistance(candles, isSwing, symbol);
 
         // 3. Multi-Factor Institutional Confluence & Strategy Generation (Scalp vs Swing)
         TradeSetup setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
@@ -329,15 +329,12 @@ public class SmcAnalysisService {
         return detectMarketStructures(candles, false);
     }
 
-    /**
-     * Mode-Adaptive Support & Resistance
-     */
-    public List<SupportResistance> detectSupportResistance(List<Candle> candles, boolean isSwing) {
+    public List<SupportResistance> detectSupportResistance(List<Candle> candles, boolean isSwing, String symbol) {
         List<SupportResistance> levels = new ArrayList<>();
         int n = candles.size();
         if (n < 10) return levels;
 
-        int lookback = isSwing ? Math.min(80, n) : Math.min(25, n);
+        int lookback = isSwing ? Math.min(80, n) : Math.min(30, n);
         double min = Double.MAX_VALUE;
         double max = Double.MIN_VALUE;
 
@@ -346,31 +343,148 @@ public class SmcAnalysisService {
             max = Math.max(max, candles.get(i).getHigh());
         }
 
+        double span = Math.max(0.01, max - min);
+        long tStart = candles.get(n - lookback).getTimestamp();
+        long tEnd = candles.get(n - 1).getTimestamp();
+
+        // 1. Classical Swing Range Boundaries
         levels.add(new SupportResistance(
                 isSwing ? "SR-SWING-SUP" : "SR-SCALP-SUP",
-                min,
+                round(min, 5),
                 isSwing ? "MAJOR MACRO SUPPORT" : "INTRADAY SUPPORT",
                 isSwing ? 6 : 3,
                 0.92,
-                candles.get(n - lookback).getTimestamp(),
-                candles.get(n - 1).getTimestamp()
+                tStart,
+                tEnd
         ));
 
         levels.add(new SupportResistance(
                 isSwing ? "SR-SWING-RES" : "SR-SCALP-RES",
-                max,
+                round(max, 5),
                 isSwing ? "MAJOR MACRO RESISTANCE" : "INTRADAY RESISTANCE",
                 isSwing ? 6 : 3,
                 0.92,
-                candles.get(n - lookback).getTimestamp(),
-                candles.get(n - 1).getTimestamp()
+                tStart,
+                tEnd
         ));
+
+        // 2. 💧 Overhead Buy-Side Liquidity (BSL) & Underneath Sell-Side Liquidity (SSL) Pools
+        double bslLevel = max * 1.0035;
+        double sslLevel = min * 0.9965;
+        levels.add(new SupportResistance(
+                "SR-BSL-POOL",
+                round(bslLevel, 5),
+                "💧 OVERHEAD BSL LIQUIDITY TARGET",
+                5,
+                0.88,
+                tStart,
+                tEnd
+        ));
+        levels.add(new SupportResistance(
+                "SR-SSL-POOL",
+                round(sslLevel, 5),
+                "💧 UNDERNEATH SSL LIQUIDITY POOL",
+                5,
+                0.88,
+                tStart,
+                tEnd
+        ));
+
+        // 3. 🎯 Macro Institutional Fibonacci Extension Overhead Reversal Zones
+        double fib1272 = max + (span * 0.272);
+        double fib1618 = max + (span * 0.618); // Golden Extension Target
+        double fib2000 = max + (span * 1.000); // 2.0 Macro Expansion Ceiling
+
+        levels.add(new SupportResistance(
+                "SR-FIB-1272",
+                round(fib1272, 5),
+                "🎯 1.272 FIB EXTENSION REVERSAL",
+                4,
+                0.91,
+                tStart,
+                tEnd
+        ));
+
+        levels.add(new SupportResistance(
+                "SR-FIB-1618",
+                round(fib1618, 5),
+                "🎯 MACRO 1.618 FIB EXPANSION (GOLDEN TARGET)",
+                5,
+                0.95,
+                tStart,
+                tEnd
+        ));
+
+        levels.add(new SupportResistance(
+                "SR-FIB-2000",
+                round(fib2000, 5),
+                "🎯 MACRO 2.000 FIB EXPANSION CEILING",
+                3,
+                0.85,
+                tStart,
+                tEnd
+        ));
+
+        // 4. 🏛️ Major Institutional Psychological Whole Round Numbers
+        if (symbol != null) {
+            String s = symbol.toUpperCase();
+            if (s.contains("XAU")) {
+                double[] goldRoundLevels = {4600.00, 4800.00, 5000.00, 5200.00, 5500.00, 6000.00};
+                for (double gr : goldRoundLevels) {
+                    if (gr >= min * 0.95 && gr <= max * 1.40) {
+                        levels.add(new SupportResistance(
+                                "SR-PSYCH-" + (int)gr,
+                                gr,
+                                gr == 5000.00 ? "🏛️ $5,000 MAJOR INSTITUTIONAL CEILING" : ("🏛️ PSYCHOLOGICAL LEVEL ($" + (int)gr + ")"),
+                                7,
+                                0.96,
+                                tStart,
+                                tEnd
+                        ));
+                    }
+                }
+            } else if (s.contains("BTC")) {
+                double[] btcLevels = {65000.0, 70000.0, 75000.0, 80000.0, 85000.0, 90000.0, 100000.0};
+                for (double br : btcLevels) {
+                    if (br >= min * 0.90 && br <= max * 1.40) {
+                        levels.add(new SupportResistance(
+                                "SR-PSYCH-" + (int)br,
+                                br,
+                                "🏛️ PSYCHOLOGICAL LEVEL ($" + (int)br + ")",
+                                6,
+                                0.94,
+                                tStart,
+                                tEnd
+                        ));
+                    }
+                }
+            } else if (s.contains("EUR") || s.contains("GBP")) {
+                double[] fxLevels = {1.16000, 1.18000, 1.20000, 1.22000};
+                for (double fr : fxLevels) {
+                    if (fr >= min * 0.95 && fr <= max * 1.10) {
+                        levels.add(new SupportResistance(
+                                "SR-PSYCH-" + String.format("%.4f", fr),
+                                fr,
+                                "🏛️ INSTITUTIONAL FX LEVEL (" + String.format("%.4f", fr) + ")",
+                                5,
+                                0.90,
+                                tStart,
+                                tEnd
+                        ));
+                    }
+                }
+            }
+        }
 
         return levels;
     }
 
+    public List<SupportResistance> detectSupportResistance(List<Candle> candles, boolean isSwing) {
+        return detectSupportResistance(candles, isSwing, "XAUUSD");
+    }
+
     public List<SupportResistance> detectSupportResistance(List<Candle> candles) {
-        return detectSupportResistance(candles, false);
+        return detectSupportResistance(candles, false, "XAUUSD");
     }
 
     /**
