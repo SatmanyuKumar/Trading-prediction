@@ -405,25 +405,14 @@ class TradingChartEngine {
 
         if (candleMin === Infinity || candleMax === -Infinity) return;
 
-        // Include nearest overhead & underneath key levels into view calculation
+        // Perfectly proportioned visible candle range with 20% top & bottom breathing room
         let displayMax = candleMax;
         let displayMin = candleMin;
-
-        if (this.flags && this.flags.sr && this.srs) {
-            this.srs.forEach(sr => {
-                if (sr.price > candleMax && sr.price <= candleMax * 1.25) {
-                    displayMax = Math.max(displayMax, sr.price);
-                }
-                if (sr.price < candleMin && sr.price >= candleMin * 0.85) {
-                    displayMin = Math.min(displayMin, sr.price);
-                }
-            });
-        }
 
         const candleRange = Math.max(0.001, displayMax - displayMin);
         const candleMid = (displayMin + displayMax) / 2.0;
 
-        const paddedRange = candleRange * 1.30;
+        const paddedRange = candleRange * 1.25;
         const effectiveHalfRange = (paddedRange / 2.0) / this.verticalScaleMultiplier;
         const centerPrice = candleMid + this.verticalOffset;
 
@@ -692,67 +681,93 @@ class TradingChartEngine {
     }
 
     drawSupportResistance(ctx, chartW, priceToY) {
-        this.srs.forEach(sr => {
-            const y = priceToY(sr.price);
+        if (!this.srs || this.srs.length === 0) return;
+
+        const chartH = this.displayHeight - this.timeAxisHeight;
+
+        // 1. Filter visible levels and sort by Y coordinate
+        const visibleLevels = this.srs
+            .map(sr => ({ ...sr, y: Math.round(priceToY(sr.price)) }))
+            .filter(sr => sr.y >= -15 && sr.y <= chartH + 15)
+            .sort((a, b) => a.y - b.y);
+
+        let lastBadgeY = -999;
+
+        visibleLevels.forEach(sr => {
+            const y = sr.y;
             const typeStr = (sr.type || '').toUpperCase();
 
-            let strokeColor = 'rgba(244, 63, 94, 0.65)';
-            let badgeBg = 'rgba(244, 63, 94, 0.22)';
-            let textColor = '#f43f5e';
-            let lineDash = [6, 4];
-            let lineWidth = 1.4;
+            let strokeColor = 'rgba(244, 63, 94, 0.55)';
+            let accentColor = '#f43f5e';
+            let lineDash = [5, 4];
+            let labelPrefix = 'RESISTANCE';
 
             if (typeStr.includes('FIB') || typeStr.includes('1.618') || typeStr.includes('1.272')) {
-                // Glowing Amber/Cyan Fib Extension
-                strokeColor = 'rgba(245, 158, 11, 0.85)';
-                badgeBg = 'rgba(245, 158, 11, 0.28)';
-                textColor = '#fbbf24';
-                lineDash = [7, 3];
-                lineWidth = 1.8;
+                strokeColor = 'rgba(245, 158, 11, 0.65)';
+                accentColor = '#f59e0b';
+                lineDash = [6, 4];
+                labelPrefix = typeStr.includes('1.618') ? 'FIB 1.618 TARGET' : (typeStr.includes('2.0') ? 'FIB 2.0 CEILING' : 'FIB 1.272 REVERSAL');
             } else if (typeStr.includes('PSYCHOLOGICAL') || typeStr.includes('INSTITUTIONAL') || typeStr.includes('5,000') || typeStr.includes('CEILING')) {
-                // Royal Purple/Blue Institutional Level
-                strokeColor = 'rgba(168, 85, 247, 0.85)';
-                badgeBg = 'rgba(168, 85, 247, 0.28)';
-                textColor = '#c084fc';
-                lineDash = [8, 4];
-                lineWidth = 1.8;
+                strokeColor = 'rgba(168, 85, 247, 0.65)';
+                accentColor = '#a855f7';
+                lineDash = [6, 4];
+                labelPrefix = 'INSTITUTIONAL LEVEL';
             } else if (typeStr.includes('BSL') || typeStr.includes('SSL') || typeStr.includes('LIQUIDITY')) {
-                // Golden Aqua Liquidity Pool
-                strokeColor = 'rgba(0, 242, 254, 0.80)';
-                badgeBg = 'rgba(0, 242, 254, 0.22)';
-                textColor = '#00f2fe';
+                strokeColor = 'rgba(6, 182, 212, 0.65)';
+                accentColor = '#06b6d4';
                 lineDash = [4, 4];
-                lineWidth = 1.6;
+                labelPrefix = typeStr.includes('BSL') ? 'BSL POOL' : 'SSL POOL';
             } else if (typeStr.includes('SUPPORT')) {
-                strokeColor = 'rgba(16, 185, 129, 0.65)';
-                badgeBg = 'rgba(16, 185, 129, 0.22)';
-                textColor = '#10b981';
+                strokeColor = 'rgba(16, 185, 129, 0.55)';
+                accentColor = '#10b981';
+                labelPrefix = 'SUPPORT';
             }
 
+            // 1. Subtle Elegant Horizontal Ray (1px Thin)
             ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = 1.0;
             ctx.setLineDash(lineDash);
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(chartW, y);
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(chartW, y + 0.5);
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Dynamic Badge Size
-            const labelText = `${sr.type} (${sr.price.toFixed(2)})`;
-            ctx.font = 'bold 9.5px JetBrains Mono';
-            const textWidth = ctx.measureText(labelText).width;
-            const badgeW = Math.max(140, textWidth + 14);
+            // 2. Collision-Free Sleek Tag (Only draw text badge if not overlapping previous badge)
+            const isColliding = Math.abs(y - lastBadgeY) < 20;
+            if (!isColliding) {
+                lastBadgeY = y;
 
-            ctx.fillStyle = badgeBg;
-            ctx.fillRect(chartW - badgeW - 10, y - 10, badgeW, 20);
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(chartW - badgeW - 10, y - 10, badgeW, 20);
+                const labelText = `${labelPrefix} ${sr.price.toFixed(sr.price > 500 ? 2 : 4)}`;
+                ctx.font = '500 9.5px JetBrains Mono, monospace';
+                const textWidth = ctx.measureText(labelText).width;
+                const badgeW = textWidth + 16;
+                const badgeH = 17;
+                const badgeX = chartW - badgeW - 8;
+                const badgeY = y - (badgeH / 2);
 
-            ctx.fillStyle = textColor;
-            ctx.textAlign = 'left';
-            ctx.fillText(labelText, chartW - badgeW - 3, y + 4);
+                // Translucent Sleek Pill
+                ctx.fillStyle = 'rgba(19, 23, 34, 0.88)';
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+                } else {
+                    ctx.rect(badgeX, badgeY, badgeW, badgeH);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                // Left Accent Indicator Line
+                ctx.fillStyle = accentColor;
+                ctx.fillRect(badgeX, badgeY, 3, badgeH);
+
+                // Clean Crisp Text
+                ctx.fillStyle = '#cbd5e1';
+                ctx.textAlign = 'left';
+                ctx.fillText(labelText, badgeX + 8, y + 3.5);
+            }
         });
     }
 
