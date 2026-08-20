@@ -488,6 +488,16 @@
                     </div>
 
                     <div class="backtest-input-group">
+                        <label>Starting Capital ($):</label>
+                        <input type="number" id="backtest-capital" class="modal-input-field" value="30" min="1" step="5" placeholder="e.g. 20, 30, 100">
+                    </div>
+
+                    <div class="backtest-input-group">
+                        <label>Trade Lot Size:</label>
+                        <input type="number" id="backtest-lotsize" class="modal-input-field" value="0.01" min="0.01" max="10.0" step="0.01" placeholder="e.g. 0.01">
+                    </div>
+
+                    <div class="backtest-input-group">
                         <label>Candle Sample:</label>
                         <select id="backtest-candles" class="modal-select">
                             <option value="200">200 Candles</option>
@@ -501,6 +511,17 @@
                     </button>
                 </div>
 
+                <!-- Quick Capital & Lot Size Presets Bar -->
+                <div class="backtest-presets-bar">
+                    <span class="preset-label">⚡ Small Capital Presets:</span>
+                    <button class="btn-capital-preset" data-capital="20" data-lot="0.01">$20 Account (0.01 Lot)</button>
+                    <button class="btn-capital-preset active" data-capital="30" data-lot="0.01">$30 Account (0.01 Lot)</button>
+                    <button class="btn-capital-preset" data-capital="50" data-lot="0.01">$50 Account (0.01 Lot)</button>
+                    <button class="btn-capital-preset" data-capital="100" data-lot="0.01">$100 Account (0.01 Lot)</button>
+                    <button class="btn-capital-preset" data-capital="500" data-lot="0.05">$500 Account (0.05 Lot)</button>
+                    <button class="btn-capital-preset" data-capital="1000" data-lot="0.10">$1,000 Account (0.10 Lot)</button>
+                </div>
+
                 <!-- KPI Metric Cards Grid -->
                 <div class="backtest-kpi-grid" id="backtest-kpi-grid">
                     <div class="kpi-card">
@@ -510,21 +531,21 @@
                     </div>
 
                     <div class="kpi-card">
+                        <span class="kpi-label">CAPITAL GROWTH</span>
+                        <span class="kpi-val text-up" id="kpi-capital-growth">$30.00 ➔ --</span>
+                        <span class="kpi-sub" id="kpi-net-profit">Net P&amp;L: $0.00 (+0.0%)</span>
+                    </div>
+
+                    <div class="kpi-card">
                         <span class="kpi-label">PROFIT FACTOR</span>
                         <span class="kpi-val highlight-cyan" id="kpi-profit-factor">--</span>
                         <span class="kpi-sub">Gross Profit / Gross Loss</span>
                     </div>
 
                     <div class="kpi-card">
-                        <span class="kpi-label">TOTAL NET PROFIT</span>
-                        <span class="kpi-val text-up" id="kpi-net-profit">$0.00</span>
-                        <span class="kpi-sub" id="kpi-return-pct">+0.00% Return</span>
-                    </div>
-
-                    <div class="kpi-card">
                         <span class="kpi-label">MAX DRAWDOWN</span>
                         <span class="kpi-val text-down" id="kpi-max-dd">--%</span>
-                        <span class="kpi-sub">Risk Contained</span>
+                        <span class="kpi-sub" id="kpi-lot-used">Lot: 0.01</span>
                     </div>
                 </div>
 
@@ -537,6 +558,7 @@
                                 <tr>
                                     <th>#</th>
                                     <th>Type</th>
+                                    <th>Lot Size</th>
                                     <th>Entry Price</th>
                                     <th>Exit Price</th>
                                     <th>Stop Loss</th>
@@ -548,7 +570,7 @@
                             </thead>
                             <tbody id="backtest-tbody">
                                 <tr>
-                                    <td colspan="9" style="text-align:center; padding: 18px; color: var(--text-dim);">
+                                    <td colspan="10" style="text-align:center; padding: 18px; color: var(--text-dim);">
                                         Click "Run Empirical Backtest" above to simulate historical performance.
                                     </td>
                                 </tr>
@@ -834,7 +856,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart-engine.js?v=4.2"></script>
-    <script src="js/app.js?v=4.2"></script>
+    <script src="js/chart-engine.js?v=4.3"></script>
+    <script src="js/app.js?v=4.3"></script>
 </body>
 </html>

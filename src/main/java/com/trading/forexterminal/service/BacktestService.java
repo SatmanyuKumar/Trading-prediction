@@ -17,23 +17,26 @@ public class BacktestService {
     private SmcAnalysisService smcAnalysisService;
 
     /**
-     * Run Empirical Historical Backtest: Dual Mode (⚡ Scalp vs 🌊 Swing)
+     * Run Empirical Historical Backtest: Dual Mode (⚡ Scalp vs 🌊 Swing) with Custom Capital & Lot Size
      */
-    public BacktestResult runBacktest(String symbol, String timeframe, String tradeMode, int requestedCandles, double initialCapital) {
+    public BacktestResult runBacktest(String symbol, String timeframe, String tradeMode, int requestedCandles, double initialCapital, double lotSize) {
         List<Candle> historicalCandles = marketDataService.getCandles(symbol, timeframe);
         String mode = (tradeMode != null && "SWING".equalsIgnoreCase(tradeMode)) ? "SWING" : "SCALP";
         boolean isSwing = "SWING".equals(mode);
 
+        double effectiveCapital = initialCapital > 0 ? initialCapital : 30.0;
+        double effectiveLotSize = lotSize > 0 ? lotSize : 0.01;
+
         if (historicalCandles == null || historicalCandles.size() < 40) {
-            return new BacktestResult(symbol, timeframe + " (" + mode + ")", 0, 0, 0, 0, 0, initialCapital, initialCapital, 0, 0, 0, 0, isSwing ? 4.5 : 2.2, List.of(), List.of(initialCapital));
+            return new BacktestResult(symbol, timeframe + " (" + mode + ")", 0, 0, 0, 0, 0, effectiveCapital, effectiveCapital, 0, 0, 0, 0, isSwing ? 4.5 : 2.2, effectiveLotSize, List.of(), List.of(effectiveCapital));
         }
 
         int totalCandles = Math.min(historicalCandles.size(), Math.max(50, requestedCandles));
         double spread = marketDataService.getSpread(symbol);
         double contractMultiplier = getContractMultiplier(symbol);
 
-        double capital = initialCapital;
-        double peakCapital = initialCapital;
+        double capital = effectiveCapital;
+        double peakCapital = effectiveCapital;
         double maxDrawdown = 0.0;
 
         int totalTrades = 0;
@@ -61,8 +64,8 @@ public class BacktestService {
                 double stopLoss = setup.getStopLoss();
                 double takeProfit = setup.getTakeProfit1();
 
-                // Safe 0.10 Mini lot in simulation
-                double lotSize = 0.10;
+                // Custom user-defined lot size (e.g. 0.01 for small capital)
+                double simLotSize = effectiveLotSize;
                 boolean orderFilled = false;
                 boolean tradeClosed = false;
                 double exitPrice = 0.0;
@@ -209,7 +212,7 @@ public class BacktestService {
 
                 if (tradeClosed) {
                     double pnlPoints = "BUY".equals(side) ? (exitPrice - entryPrice) : (entryPrice - exitPrice);
-                    double pnlDollars = (pnlPoints * lotSize * contractMultiplier) - (spread * lotSize * contractMultiplier);
+                    double pnlDollars = (pnlPoints * simLotSize * contractMultiplier) - (spread * simLotSize * contractMultiplier);
 
                     capital += pnlDollars;
                     peakCapital = Math.max(peakCapital, capital);
@@ -231,6 +234,7 @@ public class BacktestService {
                     tradeRecord.put("tradeNum", totalTrades);
                     tradeRecord.put("mode", mode);
                     tradeRecord.put("side", side);
+                    tradeRecord.put("lotSize", simLotSize);
                     tradeRecord.put("entryPrice", round(entryPrice, 5));
                     tradeRecord.put("exitPrice", round(exitPrice, 5));
                     tradeRecord.put("stopLoss", round(stopLoss, 5));
@@ -249,8 +253,8 @@ public class BacktestService {
 
         double winRate = totalTrades > 0 ? ((double) winCount / totalTrades) * 100.0 : 0.0;
         double profitFactor = grossLoss > 0 ? (grossProfit / grossLoss) : (grossProfit > 0 ? 9.99 : 0.0);
-        double netProfit = capital - initialCapital;
-        double returnPercentage = (netProfit / initialCapital) * 100.0;
+        double netProfit = capital - effectiveCapital;
+        double returnPercentage = (netProfit / effectiveCapital) * 100.0;
 
         return new BacktestResult(
                 symbol,
@@ -260,20 +264,21 @@ public class BacktestService {
                 winCount,
                 lossCount,
                 round(winRate, 1),
-                initialCapital,
+                effectiveCapital,
                 round(capital, 2),
                 round(netProfit, 2),
                 round(returnPercentage, 2),
                 round(profitFactor, 2),
                 round(maxDrawdown, 2),
                 isSwing ? 4.50 : 2.20,
+                effectiveLotSize,
                 tradeHistory,
                 equityCurve
         );
     }
 
     public BacktestResult runBacktest(String symbol, String timeframe, int requestedCandles, double initialCapital) {
-        return runBacktest(symbol, timeframe, "SCALP", requestedCandles, initialCapital);
+        return runBacktest(symbol, timeframe, "SCALP", requestedCandles, initialCapital, 0.01);
     }
 
     private double getContractMultiplier(String symbol) {

@@ -20,8 +20,9 @@ public class BacktestController {
             @RequestParam(defaultValue = "15m") String timeframe,
             @RequestParam(defaultValue = "SCALP") String tradeMode,
             @RequestParam(defaultValue = "300") int candles,
-            @RequestParam(defaultValue = "100000.0") double initialCapital) {
-        BacktestResult result = backtestService.runBacktest(symbol, timeframe, tradeMode, candles, initialCapital);
+            @RequestParam(defaultValue = "30.0") double initialCapital,
+            @RequestParam(defaultValue = "0.01") double lotSize) {
+        BacktestResult result = backtestService.runBacktest(symbol, timeframe, tradeMode, candles, initialCapital, lotSize);
         return ResponseEntity.ok(result);
     }
 }

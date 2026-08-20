@@ -1351,14 +1351,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const backtestTimeframe = document.getElementById('backtest-timeframe');
     const backtestMode = document.getElementById('backtest-mode');
     const backtestCandles = document.getElementById('backtest-candles');
+    const backtestCapital = document.getElementById('backtest-capital');
+    const backtestLotSize = document.getElementById('backtest-lotsize');
 
     const kpiWinrate = document.getElementById('kpi-winrate');
     const kpiWinsLosses = document.getElementById('kpi-wins-losses');
     const kpiProfitFactor = document.getElementById('kpi-profit-factor');
+    const kpiCapitalGrowth = document.getElementById('kpi-capital-growth');
     const kpiNetProfit = document.getElementById('kpi-net-profit');
-    const kpiReturnPct = document.getElementById('kpi-return-pct');
     const kpiMaxDd = document.getElementById('kpi-max-dd');
+    const kpiLotUsed = document.getElementById('kpi-lot-used');
     const backtestTbody = document.getElementById('backtest-tbody');
+
+    // Preset chips click listeners
+    document.querySelectorAll('.btn-capital-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-capital-preset').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            if (backtestCapital) backtestCapital.value = btn.dataset.capital;
+            if (backtestLotSize) backtestLotSize.value = btn.dataset.lot;
+        });
+    });
 
     if (btnOpenBacktestModal) {
         btnOpenBacktestModal.addEventListener('click', () => {
@@ -1383,13 +1396,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const tf = backtestTimeframe ? backtestTimeframe.value : '15m';
             const mode = backtestMode ? backtestMode.value : 'SCALP';
             const candles = backtestCandles ? backtestCandles.value : '300';
-            const capital = state.initialBalance || 100000;
+            const capital = backtestCapital ? parseFloat(backtestCapital.value) || 30.0 : 30.0;
+            const lotSize = backtestLotSize ? parseFloat(backtestLotSize.value) || 0.01 : 0.01;
 
             btnRunBacktest.disabled = true;
             btnRunBacktest.textContent = '⏳ Simulating ' + mode + ' Strategy...';
 
             try {
-                const resp = await fetch('/api/backtest?symbol=' + sym + '&timeframe=' + tf + '&tradeMode=' + mode + '&candles=' + candles + '&initialCapital=' + capital);
+                const resp = await fetch('/api/backtest?symbol=' + sym + '&timeframe=' + tf + '&tradeMode=' + mode + '&candles=' + candles + '&initialCapital=' + capital + '&lotSize=' + lotSize);
                 if (!resp.ok) throw new Error('Backtest API error');
                 const result = await resp.json();
                 renderBacktestResults(result);
@@ -1419,18 +1433,21 @@ document.addEventListener('DOMContentLoaded', () => {
             kpiProfitFactor.textContent = res.profitFactor ? res.profitFactor.toFixed(2) : '--';
             kpiProfitFactor.className = 'kpi-val ' + (res.profitFactor >= 1.5 ? 'text-up' : 'highlight-cyan');
         }
+        if (kpiCapitalGrowth) {
+            const isProfit = res.netProfit >= 0;
+            kpiCapitalGrowth.textContent = '$' + res.initialCapital.toFixed(2) + ' ➔ $' + res.finalCapital.toFixed(2);
+            kpiCapitalGrowth.className = 'kpi-val ' + (isProfit ? 'text-up' : 'text-down');
+        }
         if (kpiNetProfit) {
             const isProfit = res.netProfit >= 0;
-            kpiNetProfit.textContent = (isProfit ? '+$' : '-$') + Math.abs(res.netProfit).toLocaleString('en-US', { minimumFractionDigits: 2 });
-            kpiNetProfit.className = 'kpi-val ' + (isProfit ? 'text-up' : 'text-down');
-        }
-        if (kpiReturnPct) {
-            const isProfit = res.returnPercentage >= 0;
-            kpiReturnPct.textContent = (isProfit ? '+' : '') + res.returnPercentage.toFixed(2) + '% Return';
-            kpiReturnPct.className = 'kpi-sub ' + (isProfit ? 'text-up' : 'text-down');
+            kpiNetProfit.textContent = 'Net P&L: ' + (isProfit ? '+$' : '-$') + Math.abs(res.netProfit).toFixed(2) + ' (' + (res.returnPercentage >= 0 ? '+' : '') + res.returnPercentage.toFixed(1) + '%)';
+            kpiNetProfit.className = 'kpi-sub ' + (isProfit ? 'text-up' : 'text-down');
         }
         if (kpiMaxDd) {
             kpiMaxDd.textContent = res.maxDrawdown.toFixed(2) + '%';
+        }
+        if (kpiLotUsed) {
+            kpiLotUsed.textContent = 'Lot: ' + (res.lotSize || 0.01);
         }
 
         if (backtestTbody) {
@@ -1438,7 +1455,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const history = res.tradeHistory || [];
 
             if (history.length === 0) {
-                backtestTbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 18px; color: var(--text-dim);">No A+ ' + (res.timeframe || '') + ' trade setups were formed in this historical window.</td></tr>';
+                backtestTbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 18px; color: var(--text-dim);">No A+ ' + (res.timeframe || '') + ' trade setups were formed in this historical window.</td></tr>';
                 return;
             }
 
@@ -1461,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 tr.innerHTML = '<td>#' + t.tradeNum + '</td>' +
                     '<td class="' + (t.side === 'BUY' ? 'text-up' : 'text-down') + ' bold">' + t.side + ' <span style="font-size:10px; color:var(--text-dim);">(' + (t.mode || 'SCALP') + ')</span></td>' +
+                    '<td class="mono">' + (t.lotSize !== undefined ? t.lotSize : (res.lotSize || 0.01)) + '</td>' +
                     '<td>' + Number(t.entryPrice).toFixed(2) + '</td>' +
                     '<td>' + Number(t.exitPrice).toFixed(2) + '</td>' +
                     '<td class="text-down">' + Number(t.stopLoss).toFixed(2) + '</td>' +

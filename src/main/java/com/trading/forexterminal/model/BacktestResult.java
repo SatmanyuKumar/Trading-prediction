@@ -18,6 +18,7 @@ public class BacktestResult {
     private double profitFactor;
     private double maxDrawdown;
     private double averageRiskReward;
+    private double lotSize = 0.01;
     private List<Map<String, Object>> tradeHistory;
     private List<Double> equityCurve;
 
@@ -27,6 +28,7 @@ public class BacktestResult {
                           int winningTrades, int losingTrades, double winRate, double initialCapital,
                           double finalCapital, double netProfit, double returnPercentage,
                           double profitFactor, double maxDrawdown, double averageRiskReward,
+                          double lotSize,
                           List<Map<String, Object>> tradeHistory, List<Double> equityCurve) {
         this.symbol = symbol;
         this.timeframe = timeframe;
@@ -42,9 +44,13 @@ public class BacktestResult {
         this.profitFactor = profitFactor;
         this.maxDrawdown = maxDrawdown;
         this.averageRiskReward = averageRiskReward;
+        this.lotSize = lotSize;
         this.tradeHistory = tradeHistory;
         this.equityCurve = equityCurve;
     }
+
+    public double getLotSize() { return lotSize; }
+    public void setLotSize(double lotSize) { this.lotSize = lotSize; }
 
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
