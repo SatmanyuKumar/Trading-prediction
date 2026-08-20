@@ -936,9 +936,10 @@ class TradingChartEngine {
 
         ctx.font = 'bold 10px JetBrains Mono';
         ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
+        const isSniper = setup.setupTitle && setup.setupTitle.includes('Sniper');
         const setupIcon = isBuy ? '🚀 BUY' : '🔻 SELL';
-        ctx.fillText(`${setupIcon} 50% FVG @ ${setup.entryPrice.toFixed(setup.entryPrice > 500 ? 2 : 4)}`, badgeX + (badgeW / 2), badgeY + 15);
+        const entryTag = isSniper ? '80% OTE' : '50% FVG';
+        ctx.fillText(`${setupIcon} ${entryTag} @ ${setup.entryPrice.toFixed(setup.entryPrice > 500 ? 2 : 4)}`, badgeX + (badgeW / 2), badgeY + 15);
 
         // TP Label Inside Fixed Green Box
         ctx.font = 'bold 10px JetBrains Mono';

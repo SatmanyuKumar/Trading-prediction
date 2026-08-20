@@ -511,6 +511,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPlaybookTrigger = document.getElementById('btn-playbook-trigger');
     const chkTrailingSl = document.getElementById('chk-trailing-sl');
 
+    const btnPlaybookSniper = document.getElementById('btn-playbook-sniper');
+
     if (btnPlaybookScalp) {
         btnPlaybookScalp.addEventListener('click', () => {
             const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SCALP"]');
@@ -521,6 +523,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnPlaybookSwing) {
         btnPlaybookSwing.addEventListener('click', () => {
             const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SWING"]');
+            if (btn) btn.click();
+        });
+    }
+
+    if (btnPlaybookSniper) {
+        btnPlaybookSniper.addEventListener('click', () => {
+            const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SNIPER"]');
             if (btn) btn.click();
         });
     }

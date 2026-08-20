@@ -21,14 +21,19 @@ public class BacktestService {
      */
     public BacktestResult runBacktest(String symbol, String timeframe, String tradeMode, int requestedCandles, double initialCapital, double lotSize) {
         List<Candle> historicalCandles = marketDataService.getCandles(symbol, timeframe);
-        String mode = (tradeMode != null && "SWING".equalsIgnoreCase(tradeMode)) ? "SWING" : "SCALP";
+        String mode = "SCALP";
+        if (tradeMode != null) {
+            if ("SWING".equalsIgnoreCase(tradeMode)) mode = "SWING";
+            else if ("SNIPER".equalsIgnoreCase(tradeMode) || "DEEP".equalsIgnoreCase(tradeMode)) mode = "SNIPER";
+        }
         boolean isSwing = "SWING".equals(mode);
+        boolean isSniper = "SNIPER".equals(mode);
 
         double effectiveCapital = initialCapital > 0 ? initialCapital : 30.0;
         double effectiveLotSize = lotSize > 0 ? lotSize : 0.01;
 
         if (historicalCandles == null || historicalCandles.size() < 40) {
-            return new BacktestResult(symbol, timeframe + " (" + mode + ")", 0, 0, 0, 0, 0, effectiveCapital, effectiveCapital, 0, 0, 0, 0, isSwing ? 4.5 : 2.2, effectiveLotSize, List.of(), List.of(effectiveCapital));
+            return new BacktestResult(symbol, timeframe + " (" + mode + ")", 0, 0, 0, 0, 0, effectiveCapital, effectiveCapital, 0, 0, 0, 0, isSwing ? 4.5 : (isSniper ? 8.0 : 2.2), effectiveLotSize, List.of(), List.of(effectiveCapital));
         }
 
         int totalCandles = Math.min(historicalCandles.size(), Math.max(50, requestedCandles));
@@ -270,7 +275,7 @@ public class BacktestService {
                 round(returnPercentage, 2),
                 round(profitFactor, 2),
                 round(maxDrawdown, 2),
-                isSwing ? 4.50 : 2.20,
+                isSwing ? 4.50 : (isSniper ? 8.00 : 2.20),
                 effectiveLotSize,
                 tradeHistory,
                 equityCurve

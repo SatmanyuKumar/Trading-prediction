@@ -17,7 +17,11 @@ public class SmcAnalysisService {
             return new AnalysisResult();
         }
 
-        String mode = (tradeMode != null && "SWING".equalsIgnoreCase(tradeMode)) ? "SWING" : "SCALP";
+        String mode = "SCALP";
+        if (tradeMode != null) {
+            if ("SWING".equalsIgnoreCase(tradeMode)) mode = "SWING";
+            else if ("SNIPER".equalsIgnoreCase(tradeMode) || "DEEP".equalsIgnoreCase(tradeMode)) mode = "SNIPER";
+        }
         double currentPrice = candles.get(candles.size() - 1).getClose();
         double change24h = calculate24hChange(candles);
 
@@ -506,12 +510,14 @@ public class SmcAnalysisService {
 
         double rsi14 = calculateRSI(candles, 14);
 
-        // Mode Parameters
+        // Mode Parameters (⚡ SCALP vs 🌊 SWING vs 🎯 DEEP SNIPER for Small Capital)
         boolean isSwing = "SWING".equalsIgnoreCase(tradeMode);
-        double atrMultiplier = isSwing ? 2.0 : 1.3;
-        double tp1Multiplier = isSwing ? 3.5 : 3.0; // Strictly >= 3.0 (1:3+ R:R)
-        double tp2Multiplier = isSwing ? 5.0 : 4.5;
-        double targetRr = isSwing ? 3.5 : 3.0;
+        boolean isSniper = "SNIPER".equalsIgnoreCase(tradeMode) || "DEEP".equalsIgnoreCase(tradeMode);
+
+        double atrMultiplier = isSwing ? 2.0 : (isSniper ? 0.45 : 1.3);
+        double tp1Multiplier = isSwing ? 3.5 : (isSniper ? 8.0 : 3.0); // Sniper targets 1:8.0+
+        double tp2Multiplier = isSwing ? 5.0 : (isSniper ? 12.0 : 4.5);
+        double targetRr = isSwing ? 3.5 : (isSniper ? 8.0 : 3.0);
 
         // Timeframe Reliability Hierarchy
         String tfUpper = timeframe.toUpperCase();
@@ -596,50 +602,65 @@ public class SmcAnalysisService {
 
         if (!isBuySignal) {
             // =========================================================================
-            // 🔴 INSTITUTIONAL SELL SETUP (Trend-Aligned Short from Premium Supply FVG)
+            // 🔴 INSTITUTIONAL SELL SETUP (Trend-Aligned Short)
             // =========================================================================
-            double entry = overheadSupplyLevel;
-            double structuralHigh = Math.max(entry, rangeHigh);
-            double stopLoss = round(structuralHigh + dynamicAtrBuffer + spread, 5);
-            double risk = Math.max(minBuffer, Math.abs(stopLoss - entry));
+            double entry;
+            double stopLoss;
+
+            if (isSniper && nearestOverheadFvg != null) {
+                // Deep 80% OTE Tap into Supply Ceiling
+                double gTop = nearestOverheadFvg.getTop();
+                double gBottom = nearestOverheadFvg.getBottom();
+                double gSpan = gTop - gBottom;
+                entry = round(gTop - (gSpan * 0.20), 5);
+                stopLoss = round(gTop + (atr14 * 0.40) + spread, 5); // Micro-SL right above FVG ceiling
+            } else {
+                entry = overheadSupplyLevel;
+                double structuralHigh = Math.max(entry, rangeHigh);
+                stopLoss = round(structuralHigh + dynamicAtrBuffer + spread, 5);
+            }
+
+            double risk = Math.max(isSniper ? minBuffer * 0.35 : minBuffer, Math.abs(stopLoss - entry));
             stopLoss = round(entry + risk, 5);
 
             double tp1 = round(entry - (risk * tp1Multiplier), 5);
             double tp2 = round(entry - (risk * tp2Multiplier), 5);
+            double calculatedRr = round(Math.abs(entry - tp1) / risk, 1);
 
-            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSwing ? 96 : 92) : (isSwing ? 90 : 86);
+            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
 
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-            confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Trend Continuation" : "⚡ Scalp / Intraday Momentum"));
+            confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode" : (isSwing ? "🌊 Swing / Macro Trend Continuation" : "⚡ Scalp / Intraday Momentum")));
             confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
-            confluences.add(nearestOverheadFvg != null ? "50% Consequent Encroachment (C.E.) Supply Retest: " + formatPrice(overheadSupplyLevel, symbol) : "Macro Supply Liquidity Pool");
+            confluences.add(nearestOverheadFvg != null ? (isSniper ? "🎯 80% Deep OTE Supply Retest: " + formatPrice(entry, symbol) : "50% C.E. Supply Retest: " + formatPrice(overheadSupplyLevel, symbol)) : "Macro Supply Liquidity Pool");
             confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
-            confluences.add("Target Risk-to-Reward: 1:" + targetRr + " (Asymmetric Short Expectancy)");
+            confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Asymmetric Short Expectancy)");
 
-            String setupTitle = isSwing 
-                ? "🎯 4H/Macro Bearish Trend: Supply Pullback targeting Downside Demand" 
-                : "⚡ Scalp Supply Tap: High-Probability Short Rejection";
+            String setupTitle = isSniper
+                ? "🎯 Deep Sniper Short: 80% OTE Retest (1:8+ Small Capital Shield)"
+                : (isSwing ? "🎯 4H/Macro Bearish Trend: Supply Pullback targeting Downside Demand" : "⚡ Scalp Supply Tap: High-Probability Short Rejection");
 
             String bookExplanation = String.format(
                 "### 📚 %s (ICT Bearish Order Flow Blueprint)\n\n" +
                 "1. **Institutional Market Direction:**\n" +
                 "   Market structure on %s is in **Bearish Trend Alignment** seeking downside Discount Liquidity.\n\n" +
                 "2. **Premium Supply Entry Coordination:**\n" +
-                "   Smart money waits for a pullback into the **Overhead Bearish Supply FVG at %s** to initiate short inventory.\n\n" +
+                "   Smart money waits for an %s into the **Overhead Bearish Supply FVG at %s**.\n\n" +
                 "3. **Entry Coordinates & Buffer:**\n" +
                 "   Short entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
-                isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap",
+                isSniper ? "🎯 Deep Sniper OTE Short Blueprint" : (isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap"),
                 timeframe,
+                isSniper ? "80% Deep OTE Pullback" : "Pullback",
                 formatPrice(overheadSupplyLevel, symbol),
                 formatPrice(entry, symbol),
                 formatPrice(stopLoss, symbol),
                 atrMultiplier,
                 formatPrice(tp1, symbol),
                 formatPrice(tp2, symbol),
-                targetRr
+                calculatedRr
             );
 
             return new TradeSetup(
@@ -653,7 +674,7 @@ public class SmcAnalysisService {
                     stopLoss,
                     tp1,
                     tp2,
-                    targetRr,
+                    calculatedRr,
                     setupTitle,
                     confluences,
                     bookExplanation,
@@ -661,46 +682,60 @@ public class SmcAnalysisService {
             );
         } else {
             // =========================================================================
-            // 🟢 INSTITUTIONAL BUY SETUP (Trend-Aligned Long from Discount Demand FVG)
+            // 🟢 INSTITUTIONAL BUY SETUP (Trend-Aligned Long)
             // =========================================================================
-            double entry = underneathDemandLevel + spread;
-            double structuralLow = Math.min(entry, rangeLow);
-            double stopLoss = round(structuralLow - dynamicAtrBuffer, 5);
-            double risk = Math.max(minBuffer, Math.abs(entry - stopLoss));
+            double entry;
+            double stopLoss;
+
+            if (isSniper && nearestUnderneathFvg != null) {
+                // Deep 80% OTE Tap into Demand Floor
+                double gTop = nearestUnderneathFvg.getTop();
+                double gBottom = nearestUnderneathFvg.getBottom();
+                double gSpan = gTop - gBottom;
+                entry = round(gBottom + (gSpan * 0.20) + spread, 5);
+                stopLoss = round(gBottom - (atr14 * 0.40) - spread, 5); // Micro-SL right below FVG floor
+            } else {
+                entry = underneathDemandLevel + spread;
+                double structuralLow = Math.min(entry, rangeLow);
+                stopLoss = round(structuralLow - dynamicAtrBuffer, 5);
+            }
+
+            double risk = Math.max(isSniper ? minBuffer * 0.35 : minBuffer, Math.abs(entry - stopLoss));
             stopLoss = round(entry - risk, 5);
 
-            double idealTp1 = Math.max(entry + (risk * tp1Multiplier), overheadSupplyLevel);
+            double idealTp1 = isSniper ? round(entry + (risk * tp1Multiplier), 5) : Math.max(entry + (risk * tp1Multiplier), overheadSupplyLevel);
             double tp1 = round(idealTp1, 5);
             double tp2 = round(entry + (risk * tp2Multiplier), 5);
             double calculatedRr = round(Math.abs(tp1 - entry) / risk, 1);
 
-            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSwing ? 96 : 92) : (isSwing ? 90 : 86);
+            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
 
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-            confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Bullish Expansion" : "⚡ Scalp / Intraday Momentum"));
+            confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode" : (isSwing ? "🌊 Swing / Macro Bullish Expansion" : "⚡ Scalp / Intraday Momentum")));
             confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
-            confluences.add(nearestUnderneathFvg != null ? "50% Consequent Encroachment (C.E.) Demand Retest: " + formatPrice(underneathDemandLevel, symbol) : "Discount Equilibrium Accumulation Retest");
+            confluences.add(nearestUnderneathFvg != null ? (isSniper ? "🎯 80% Deep OTE Demand Retest: " + formatPrice(entry, symbol) : "50% C.E. Demand Retest: " + formatPrice(underneathDemandLevel, symbol)) : "Discount Equilibrium Accumulation Retest");
             confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Asymmetric Expectancy)");
 
-            String setupTitle = isSwing 
-                ? "🚀 4H/Macro Bullish Expansion: Demand Pullback targeting Overhead Supply" 
-                : "⚡ Scalp Demand Tap: Rapid Push towards Overhead Liquidity";
+            String setupTitle = isSniper
+                ? "🎯 Deep Sniper Long: 80% OTE Retest (1:8+ Small Capital Shield)"
+                : (isSwing ? "🚀 4H/Macro Bullish Expansion: Demand Pullback targeting Overhead Supply" : "⚡ Scalp Demand Tap: Rapid Push towards Overhead Liquidity");
 
             String bookExplanation = String.format(
                 "### 📚 %s (ICT OTE & Bullish Expansion Blueprint)\n\n" +
                 "1. **Institutional Target Magnet:**\n" +
                 "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply FVG at %s**.\n\n" +
                 "2. **Discount Entry Coordination:**\n" +
-                "   Smart money waits for a pullback into the **Discount Bullish Demand zone at %s** to enter with low risk.\n\n" +
+                "   Smart money waits for an %s into the **Discount Bullish Demand zone at %s** to enter with microscopic risk.\n\n" +
                 "3. **Entry Coordinates & Buffer:**\n" +
                 "   Buy entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** (Overhead Target) and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
-                isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion",
+                isSniper ? "🎯 Deep Sniper OTE Long Blueprint" : (isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion"),
                 timeframe,
-                formatPrice(overheadSupplyLevel, symbol),
+                overheadSupplyLevel > 0 ? formatPrice(overheadSupplyLevel, symbol) : "Target Liquidity",
+                isSniper ? "80% Deep OTE Retest" : "Pullback",
                 formatPrice(underneathDemandLevel, symbol),
                 formatPrice(entry, symbol),
                 formatPrice(stopLoss, symbol),
@@ -978,7 +1013,7 @@ public class SmcAnalysisService {
         List<TradeRadarItem> radarList = new ArrayList<>();
         List<String> pairs = List.of("XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "BTCUSD");
         List<String> timeframes = List.of("5m", "15m", "30m", "1h", "4h");
-        List<String> modes = List.of("SCALP", "SWING");
+        List<String> modes = List.of("SCALP", "SWING", "SNIPER");
 
         for (String sym : pairs) {
             Double curPrice = currentPrices.get(sym);
@@ -994,6 +1029,7 @@ public class SmcAnalysisService {
                 for (String mode : modes) {
                     if ("SCALP".equals(mode) && ("1h".equals(tf) || "4h".equals(tf))) continue;
                     if ("SWING".equals(mode) && ("5m".equals(tf))) continue;
+                    if ("SNIPER".equals(mode) && ("4h".equals(tf))) continue;
 
                     AnalysisResult analysis = analyzeMarket(sym, tf, mode, new ArrayList<>(candles), spread);
                     TradeSetup setup = analysis.getTradeSetup();
