@@ -627,11 +627,17 @@ public class SmcAnalysisService {
             double tp2 = round(entry - (risk * tp2Multiplier), 5);
             double calculatedRr = round(Math.abs(entry - tp1) / risk, 1);
 
+            double anchorWickHigh = (isSniper && nearestOverheadFvg != null) 
+                ? nearestOverheadFvg.getTop() 
+                : Math.max(entry, rangeHigh);
+            double bufferApplied = Math.abs(stopLoss - anchorWickHigh);
+
             confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
 
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode" : (isSwing ? "🌊 Swing / Macro Trend Continuation" : "⚡ Scalp / Intraday Momentum")));
             confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
+            confluences.add("🛡️ Invalidation Anchor: Wick High @" + formatPrice(anchorWickHigh, symbol) + " + Buffer (+" + formatPrice(bufferApplied, symbol) + ") ➔ SL: " + formatPrice(stopLoss, symbol));
             confluences.add(nearestOverheadFvg != null ? (isSniper ? "🎯 80% Deep OTE Supply Retest: " + formatPrice(entry, symbol) : "50% C.E. Supply Retest: " + formatPrice(overheadSupplyLevel, symbol)) : "Macro Supply Liquidity Pool");
             confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
@@ -647,17 +653,18 @@ public class SmcAnalysisService {
                 "   Market structure on %s is in **Bearish Trend Alignment** seeking downside Discount Liquidity.\n\n" +
                 "2. **Premium Supply Entry Coordination:**\n" +
                 "   Smart money waits for an %s into the **Overhead Bearish Supply FVG at %s**.\n\n" +
-                "3. **Entry Coordinates & Buffer:**\n" +
-                "   Short entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
+                "3. **Wick Anchor & Buffer Invalidation:**\n" +
+                "   SL is anchored above **Wick High at %s** plus a dynamic **%.1f× ATR Buffer (%s)** for sweep protection ➔ Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
                 isSniper ? "🎯 Deep Sniper OTE Short Blueprint" : (isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap"),
                 timeframe,
                 isSniper ? "80% Deep OTE Pullback" : "Pullback",
                 formatPrice(overheadSupplyLevel, symbol),
-                formatPrice(entry, symbol),
-                formatPrice(stopLoss, symbol),
+                formatPrice(anchorWickHigh, symbol),
                 atrMultiplier,
+                formatPrice(bufferApplied, symbol),
+                formatPrice(stopLoss, symbol),
                 formatPrice(tp1, symbol),
                 formatPrice(tp2, symbol),
                 calculatedRr
@@ -708,11 +715,17 @@ public class SmcAnalysisService {
             double tp2 = round(entry + (risk * tp2Multiplier), 5);
             double calculatedRr = round(Math.abs(tp1 - entry) / risk, 1);
 
+            double anchorWickLow = (isSniper && nearestUnderneathFvg != null) 
+                ? nearestUnderneathFvg.getBottom() 
+                : Math.min(entry, rangeLow);
+            double bufferApplied = Math.abs(anchorWickLow - stopLoss);
+
             confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
 
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode" : (isSwing ? "🌊 Swing / Macro Bullish Expansion" : "⚡ Scalp / Intraday Momentum")));
             confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
+            confluences.add("🛡️ Invalidation Anchor: Wick Low @" + formatPrice(anchorWickLow, symbol) + " - Buffer (-" + formatPrice(bufferApplied, symbol) + ") ➔ SL: " + formatPrice(stopLoss, symbol));
             confluences.add(nearestUnderneathFvg != null ? (isSniper ? "🎯 80% Deep OTE Demand Retest: " + formatPrice(entry, symbol) : "50% C.E. Demand Retest: " + formatPrice(underneathDemandLevel, symbol)) : "Discount Equilibrium Accumulation Retest");
             confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
@@ -728,8 +741,8 @@ public class SmcAnalysisService {
                 "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply FVG at %s**.\n\n" +
                 "2. **Discount Entry Coordination:**\n" +
                 "   Smart money waits for an %s into the **Discount Bullish Demand zone at %s** to enter with microscopic risk.\n\n" +
-                "3. **Entry Coordinates & Buffer:**\n" +
-                "   Buy entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
+                "3. **Wick Anchor & Buffer Invalidation:**\n" +
+                "   SL is anchored below **Wick Low at %s** minus a dynamic **%.1f× ATR Buffer (%s)** for sweep protection ➔ Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** (Overhead Target) and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
                 isSniper ? "🎯 Deep Sniper OTE Long Blueprint" : (isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion"),
@@ -737,9 +750,10 @@ public class SmcAnalysisService {
                 overheadSupplyLevel > 0 ? formatPrice(overheadSupplyLevel, symbol) : "Target Liquidity",
                 isSniper ? "80% Deep OTE Retest" : "Pullback",
                 formatPrice(underneathDemandLevel, symbol),
-                formatPrice(entry, symbol),
-                formatPrice(stopLoss, symbol),
+                formatPrice(anchorWickLow, symbol),
                 atrMultiplier,
+                formatPrice(bufferApplied, symbol),
+                formatPrice(stopLoss, symbol),
                 formatPrice(tp1, symbol),
                 formatPrice(tp2, symbol),
                 calculatedRr

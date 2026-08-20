@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setupTitle = document.getElementById('setup-title');
     const valEntry = document.getElementById('val-entry');
     const valSl = document.getElementById('val-sl');
+    const valSlSub = document.getElementById('val-sl-sub');
     const valTp1 = document.getElementById('val-tp1');
     const valRr = document.getElementById('val-rr');
     const zoneBullFvg = document.getElementById('zone-bull-fvg');
@@ -735,11 +736,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isHold) {
             if (valEntry) valEntry.textContent = 'Stand Aside';
             if (valSl) valSl.textContent = 'Protected (No Risk)';
+            if (valSlSub) valSlSub.textContent = 'Zero Capital Exposure';
             if (valTp1) valTp1.textContent = 'Waiting A+';
             if (valRr) valRr.textContent = '--';
         } else {
             if (valEntry) valEntry.textContent = formatPrice(setup.entryPrice, setup.symbol);
             if (valSl) valSl.textContent = formatPrice(setup.stopLoss, setup.symbol);
+            if (valSlSub) {
+                const anchorPt = (setup.confluencePoints || []).find(p => p && p.includes('Invalidation Anchor'));
+                if (anchorPt) {
+                    valSlSub.textContent = anchorPt.replace('🛡️ Invalidation Anchor: ', '');
+                } else {
+                    valSlSub.textContent = 'Wick Floor ± 1.3x ATR';
+                }
+            }
             if (valTp1) valTp1.textContent = formatPrice(setup.takeProfit1, setup.symbol);
             if (valRr) valRr.textContent = '1 : ' + setup.riskRewardRatio;
         }
