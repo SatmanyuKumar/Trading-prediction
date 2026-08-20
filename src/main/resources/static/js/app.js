@@ -546,14 +546,39 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 9. Journal Tabs
+    // 9. Journal Tabs & AI Setup History 3-Mode Segmentation
     const tabBtnSuggestions = document.getElementById('tab-btn-suggestions');
     const countSuggestions = document.getElementById('count-suggestions');
     const tableHeadersRow = document.getElementById('table-headers');
 
     const btnClearAiHistory = document.getElementById('btn-clear-ai-history');
+    const suggFilterBar = document.getElementById('sugg-filter-bar');
+    const suggCountAll = document.getElementById('sugg-count-all');
+    const suggCountScalp = document.getElementById('sugg-count-scalp');
+    const suggCountSwing = document.getElementById('sugg-count-swing');
+    const suggCountSniper = document.getElementById('sugg-count-sniper');
+    const suggFilterStats = document.getElementById('sugg-filter-stats');
+    const suggChips = document.querySelectorAll('.sugg-chip');
+    
+    state.suggFilter = 'ALL';
+
+    suggChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            suggChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            state.suggFilter = chip.getAttribute('data-smode') || 'ALL';
+            renderSuggestionsUI();
+        });
+    });
 
     function syncJournalActionButtons() {
+        if (suggFilterBar) {
+            if (state.journalTab === 'suggestions') {
+                suggFilterBar.classList.remove('hidden');
+            } else {
+                suggFilterBar.classList.add('hidden');
+            }
+        }
         if (btnClearAiHistory && btnClearHistory) {
             if (state.journalTab === 'suggestions') {
                 btnClearAiHistory.style.display = 'inline-flex';
@@ -1096,6 +1121,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {}
     }
 
+    function getNormalizedSuggMode(sugg) {
+        if (!sugg) return 'SCALP';
+        const m = (sugg.mode || '').toUpperCase();
+        const type = (sugg.setupType || '').toUpperCase();
+        if (m === 'SNIPER' || type.includes('SNIPER') || type.includes('OTE')) return 'SNIPER';
+        if (m === 'SWING' || type.includes('SWING') || type.includes('MACRO')) return 'SWING';
+        return 'SCALP';
+    }
+
     function renderSuggestionsUI() {
         if (!positionsTbody) return;
         if (tableHeadersRow) {
@@ -1103,9 +1137,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<th>Time</th>' +
                 '<th>Symbol</th>' +
                 '<th>TF</th>' +
-                '<th>Mode</th>' +
+                '<th>Strategy Mode</th>' +
                 '<th>Signal</th>' +
-                '<th>50% FVG Entry</th>' +
+                '<th>Entry Level</th>' +
                 '<th>Stop Loss</th>' +
                 '<th>Take Profit</th>' +
                 '<th>R:R Ratio</th>' +
@@ -1118,16 +1152,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = state.suggestions || [];
         positionsTbody.innerHTML = '';
 
-        if (list.length === 0) {
-            positionsTbody.innerHTML = '<tr class="empty-row"><td colspan="13">No AI setup suggestions recorded yet. Radar scans and logs high R:R setups automatically.</td></tr>';
-            return;
+        // 1. Calculate counts for each of the 3 separate sections
+        const scalpList = list.filter(s => getNormalizedSuggMode(s) === 'SCALP');
+        const swingList = list.filter(s => getNormalizedSuggMode(s) === 'SWING');
+        const sniperList = list.filter(s => getNormalizedSuggMode(s) === 'SNIPER');
+
+        if (suggCountAll) suggCountAll.textContent = list.length;
+        if (suggCountScalp) suggCountScalp.textContent = scalpList.length;
+        if (suggCountSwing) suggCountSwing.textContent = swingList.length;
+        if (suggCountSniper) suggCountSniper.textContent = sniperList.length;
+
+        // 2. Select filtered dataset based on active filter chip
+        let filteredList = list;
+        let modeLabel = 'All 3 Modes';
+        if (state.suggFilter === 'SCALP') {
+            filteredList = scalpList;
+            modeLabel = '⚡ Scalp Mode';
+        } else if (state.suggFilter === 'SWING') {
+            filteredList = swingList;
+            modeLabel = '🌊 Swing Mode';
+        } else if (state.suggFilter === 'SNIPER') {
+            filteredList = sniperList;
+            modeLabel = '🎯 Deep Sniper Mode';
         }
 
+        if (suggFilterStats) {
+            suggFilterStats.textContent = `Showing ${filteredList.length} ${modeLabel} Records`;
+        }
+
+        // 3. Mode-Specific Win Rate & Realized PnL Calculation
         let totalWins = 0;
         let totalLosses = 0;
         let totalSuggPnl = 0.0;
 
-        list.forEach(sugg => {
+        filteredList.forEach(sugg => {
             if (sugg.triggerState === 'TP_HIT') {
                 totalWins++;
                 totalSuggPnl += (sugg.pnl || 0.0);
@@ -1150,11 +1208,27 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRealizedPnl.className = 'm-val ' + (totalSuggPnl >= 0 ? 'text-up' : 'text-down');
         }
 
-        list.forEach(sugg => {
+        if (filteredList.length === 0) {
+            const emptyMsg = state.suggFilter === 'ALL'
+                ? 'No AI setup suggestions recorded yet. Radar scans and logs setups automatically.'
+                : `No ${modeLabel} setups recorded yet. Switch tabs to see other modes.`;
+            positionsTbody.innerHTML = '<tr class="empty-row"><td colspan="13">' + emptyMsg + '</td></tr>';
+            return;
+        }
+
+        filteredList.forEach(sugg => {
             const tr = document.createElement('tr');
             const isBull = sugg.signal === 'BUY';
             const timeStr = new Date(sugg.suggestedTime).toLocaleTimeString();
+            const normMode = getNormalizedSuggMode(sugg);
             
+            let modeBadge = '<span class="mode-pill scalp" style="background:rgba(14,165,233,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">⚡ SCALP</span>';
+            if (normMode === 'SWING') {
+                modeBadge = '<span class="mode-pill swing" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🌊 SWING</span>';
+            } else if (normMode === 'SNIPER') {
+                modeBadge = '<span class="mode-pill sniper" style="background:rgba(234,179,8,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🎯 SNIPER</span>';
+            }
+
             let stateBadge = '<span class="status-badge breakeven">⏳ PENDING PULLBACK</span>';
             let pnlStr = '<span style="color:var(--text-dim);">$0.00</span>';
 
@@ -1173,17 +1247,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<td style="font-size:11px; color:var(--text-dim);">' + timeStr + '</td>' +
                 '<td><strong>' + sugg.symbol + '</strong></td>' +
                 '<td><span class="tf-badge">' + sugg.timeframe + '</span></td>' +
-                '<td><span style="color:var(--accent-cyan); font-size:10.5px; font-weight:700;">' + sugg.mode + '</span></td>' +
+                '<td>' + modeBadge + '</td>' +
                 '<td class="' + (isBull ? 'text-up' : 'text-down') + ' bold">' + sugg.signal + '</td>' +
                 '<td class="highlight-cyan">' + formatPrice(sugg.entryPrice, sugg.symbol) + '</td>' +
                 '<td class="text-down">' + formatPrice(sugg.stopLoss, sugg.symbol) + '</td>' +
                 '<td class="text-up">' + formatPrice(sugg.takeProfit, sugg.symbol) + '</td>' +
-                '<td class="bold" style="color:#fbbf24;">1 : ' + (sugg.riskRewardRatio ? sugg.riskRewardRatio.toFixed(1) : '3.0') + '</td>' +
+                '<td class="bold" style="color:#fbbf24;">1 : ' + (sugg.riskRewardRatio ? sugg.riskRewardRatio.toFixed(1) : (normMode === 'SNIPER' ? '8.0' : (normMode === 'SWING' ? '4.5' : '3.0'))) + '</td>' +
                 '<td>' + sugg.confidence + '%</td>' +
                 '<td>' + stateBadge + '</td>' +
                 '<td>' + pnlStr + '</td>' +
                 '<td style="text-align:center; white-space:nowrap;">' +
-                    '<button class="btn-radar-switch" style="padding:4px 8px; font-size:10px; margin-right:4px; cursor:pointer;" onclick="window.viewSuggestionSetup(\'' + sugg.symbol + '\', \'' + sugg.timeframe + '\', \'' + sugg.mode + '\')">📊 Chart</button>' +
+                    '<button class="btn-radar-switch" style="padding:4px 8px; font-size:10px; margin-right:4px; cursor:pointer;" onclick="window.viewSuggestionSetup(\'' + sugg.symbol + '\', \'' + sugg.timeframe + '\', \'' + normMode + '\')">📊 Chart</button>' +
                     '<button class="btn-arm-limit" style="padding:4px 8px; font-size:10px; background:linear-gradient(135deg, #0284c7, #0369a1); color:#fff; border:1px solid #38bdf8; border-radius:4px; font-weight:700; cursor:pointer;" onclick="window.armSuggestionAsLimitOrder(\'' + sugg.symbol + '\', \'' + sugg.signal + '\', \'' + sugg.timeframe + '\', ' + sugg.entryPrice + ', ' + sugg.stopLoss + ', ' + sugg.takeProfit + ')">⚡ Arm Limit</button>' +
                 '</td>';
 

@@ -2773,3 +2773,69 @@ body.dark-theme {
     color: #ffffff;
     box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
 }
+
+/* AI Setup History 3-Mode Filter Chips */
+.sugg-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(14, 19, 29, 0.75);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.sugg-filter-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-dim);
+    margin-right: 4px;
+}
+
+.sugg-chip {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--font-main);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #94a3b8;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sugg-chip:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.sugg-chip.active {
+    background: rgba(0, 242, 254, 0.18);
+    border-color: var(--accent-cyan);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(0, 242, 254, 0.25);
+}
+
+.sugg-chip.chip-scalp.active {
+    background: rgba(14, 165, 233, 0.22);
+    border-color: #38bdf8;
+    color: #38bdf8;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.sugg-chip.chip-swing.active {
+    background: rgba(168, 85, 247, 0.22);
+    border-color: #c084fc;
+    color: #c084fc;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+}
+
+.sugg-chip.chip-sniper.active {
+    background: rgba(234, 179, 8, 0.22);
+    border-color: #fbbf24;
+    color: #fbbf24;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+}
