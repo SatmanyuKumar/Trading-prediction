@@ -1836,6 +1836,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/market`;
+        
+        try {
+            const ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                if (connStatus) {
+                    connStatus.textContent = 'ONLINE (0 LAG)';
+                    connStatus.className = 'status-indicator online';
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data && data.type === 'TICK' && data.prices) {
+                        const curPrice = data.prices[state.symbol];
+                        if (curPrice && curPrice > 0) {
+                            // Instant Zero-Delay Header Stats Update
+                            if (statPrice) statPrice.textContent = formatPrice(curPrice, state.symbol);
+                            
+                            const sp = (state.analysis && state.analysis.spread) ? state.analysis.spread : (state.symbol.includes('XAU') ? 0.35 : 0.00015);
+                            const ask = curPrice + sp;
+                            const bid = curPrice;
+
+                            if (buyAskPrice) buyAskPrice.textContent = 'Ask: ' + formatPrice(ask, state.symbol);
+                            if (sellBidPrice) sellBidPrice.textContent = 'Bid: ' + formatPrice(bid, state.symbol);
+
+                            // Smooth 60 FPS Sub-pixel Chart Engine Update
+                            chart.updateLiveTick(state.symbol, curPrice, curPrice, curPrice, data.timestamp);
+                        }
+                    }
+                } catch (e) {}
+            };
+
+            ws.onclose = () => {
+                if (connStatus) {
+                    connStatus.textContent = 'RECONNECTING...';
+                }
+                setTimeout(connectWebSocket, 2000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        } catch (e) {
+            setTimeout(connectWebSocket, 3000);
+        }
+    }
+
     // Initial Start
     loadAccount();
     updatePipValue();

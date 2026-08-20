@@ -44,10 +44,16 @@ class TradingChartEngine {
         this.verticalScaleMultiplier = 1.0; // custom vertical zoom
         this.verticalOffset = 0.0; // custom vertical price pan
 
-        this.paddingTop = 20;
-        this.paddingBottom = 20;
+        this.paddingTop = 24;
+        this.paddingBottom = 24;
         this.priceAxisWidth = 90;
         this.timeAxisHeight = 28;
+
+        // Smooth 60 FPS Live Interpolation & Pulse Beacon
+        this.livePrice = 0;
+        this.targetLivePrice = 0;
+        this.currentSymbol = 'XAUUSD';
+        this.pulsePhase = 0;
 
         // Interaction State
         this.isDragging = false;
@@ -232,7 +238,19 @@ class TradingChartEngine {
     }
 
     startRenderLoop() {
-        const loop = () => {
+        const loop = (timestamp) => {
+            // 60 FPS Smooth Linear Interpolation (LERP) for incoming live ticks
+            if (this.targetLivePrice > 0 && Math.abs(this.livePrice - this.targetLivePrice) > 0.000001) {
+                this.livePrice += (this.targetLivePrice - this.livePrice) * 0.40;
+                if (Math.abs(this.livePrice - this.targetLivePrice) < 0.00001) {
+                    this.livePrice = this.targetLivePrice;
+                }
+                this.needsRender = true;
+            }
+
+            // Beacon breathing phase for live pulse
+            this.pulsePhase = ((timestamp || performance.now()) / 350) % (Math.PI * 2);
+
             if (this.needsRender) {
                 this.needsRender = false;
                 this.render();
@@ -240,6 +258,25 @@ class TradingChartEngine {
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
+    }
+
+    updateLiveTick(symbol, price, high, low, timestamp) {
+        if (!price || price <= 0) return;
+        if (symbol && this.currentSymbol && symbol !== this.currentSymbol) return;
+
+        this.targetLivePrice = price;
+        if (this.livePrice === 0) this.livePrice = price;
+
+        if (this.candles && this.candles.length > 0) {
+            const last = this.candles[this.candles.length - 1];
+            last.close = price;
+            if (high && high > last.high) last.high = high;
+            if (low && low < last.low) last.low = low;
+            if (price > last.high) last.high = price;
+            if (price < last.low) last.low = price;
+        }
+
+        this.requestRender();
     }
 
     requestRender() {
@@ -263,6 +300,7 @@ class TradingChartEngine {
 
     setData(analysisData) {
         if (!analysisData) return;
+        this.currentSymbol = analysisData.symbol || this.currentSymbol;
         this.candles = analysisData.candles || [];
         this.fvgs = analysisData.fairValueGaps || [];
         this.obs = analysisData.orderBlocks || [];
@@ -272,6 +310,12 @@ class TradingChartEngine {
         this.ema50 = analysisData.ema50 || [];
         this.ema200 = analysisData.ema200 || [];
         this.tradeSetup = analysisData.tradeSetup || null;
+
+        if (analysisData.currentPrice) {
+            this.targetLivePrice = analysisData.currentPrice;
+            if (this.livePrice === 0) this.livePrice = analysisData.currentPrice;
+        }
+
         this.requestRender();
     }
 
@@ -323,12 +367,13 @@ class TradingChartEngine {
         const ctx = this.ctx;
 
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#080b11';
+        // TradingView Signature Dark Theme Velvet Canvas
+        ctx.fillStyle = '#131722';
         ctx.fillRect(0, 0, w, h);
 
         if (this.candles.length === 0) {
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '14px Plus Jakarta Sans';
+            ctx.fillStyle = '#787b86';
+            ctx.font = '500 13px Inter, -apple-system, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('Streaming live authentic exchange candles...', w / 2, h / 2);
             return;
@@ -399,7 +444,7 @@ class TradingChartEngine {
             return chartW - ((fractionalEnd - idx) * step) - (this.candleWidth / 2);
         };
 
-        // 1. Grid
+        // 1. TradingView Subtle Grid Lines
         this.drawGrid(ctx, chartW, chartH, minPrice, maxPrice, priceToY);
 
         // 2. Support & Resistance (if checked)
@@ -419,12 +464,12 @@ class TradingChartEngine {
 
         // 5. EMAs (if checked)
         if (this.flags.ema) {
-            this.drawEMALine(ctx, this.ema20, startIndex, endIndex, indexToX, priceToY, '#00f2fe', 1.5);
-            this.drawEMALine(ctx, this.ema50, startIndex, endIndex, indexToX, priceToY, '#f97316', 1.5);
-            this.drawEMALine(ctx, this.ema200, startIndex, endIndex, indexToX, priceToY, '#a855f7', 2.0);
+            this.drawEMALine(ctx, this.ema20, startIndex, endIndex, indexToX, priceToY, '#2962ff', 1.8);
+            this.drawEMALine(ctx, this.ema50, startIndex, endIndex, indexToX, priceToY, '#ff9800', 1.8);
+            this.drawEMALine(ctx, this.ema200, startIndex, endIndex, indexToX, priceToY, '#9c27b0', 2.2);
         }
 
-        // 6. Candlesticks (Sub-pixel antialiased, perfectly centered)
+        // 6. Candlesticks (TradingView Precision Colors: #089981 Bull / #f23645 Bear)
         this.drawCandles(ctx, visibleCandles, startIndex, indexToX, priceToY);
 
         // 7. Market Structure (BOS) (if checked)
@@ -441,24 +486,26 @@ class TradingChartEngine {
         this.drawPriceAxis(ctx, chartW, chartH, minPrice, maxPrice, priceToY);
         this.drawTimeAxis(ctx, chartW, chartH, visibleCandles, startIndex, indexToX);
 
-        // 10. Live Current Price Line & Crosshair
+        // 10. Live Smooth Animated Price Line & Pulsating Beacon
         const lastCandle = this.candles[this.candles.length - 1];
-        const lastPrice = lastCandle.close !== undefined ? lastCandle.close : lastCandle.getClose();
-        this.drawCurrentPriceLine(ctx, chartW, lastPrice, priceToY);
+        const lastPrice = (this.livePrice > 0) ? this.livePrice : (lastCandle.close !== undefined ? lastCandle.close : lastCandle.getClose());
+        const lastOpen = lastCandle.open !== undefined ? lastCandle.open : lastCandle.getOpen();
+        const lastCandleX = indexToX(this.candles.length - 1) + this.candleWidth;
+        this.drawCurrentPriceLine(ctx, chartW, lastPrice, lastOpen, lastCandleX, priceToY);
 
         if (this.mouseX >= 0 && this.mouseY >= 0 && this.mouseX <= chartW && this.mouseY <= chartH) {
-            this.drawCrosshair(ctx, chartW, chartH, this.mouseX, this.mouseY, yToPrice);
+            this.drawCrosshair(ctx, chartW, chartH, this.mouseX, this.mouseY, yToPrice, indexToX, visibleCandles, startIndex);
         }
     }
 
     drawGrid(ctx, chartW, chartH, minPrice, maxPrice, priceToY) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+        ctx.strokeStyle = 'rgba(42, 46, 57, 0.45)';
         ctx.lineWidth = 1;
         const stepCount = 8;
         const priceStep = (maxPrice - minPrice) / stepCount;
         for (let i = 0; i <= stepCount; i++) {
             const p = minPrice + i * priceStep;
-            const y = priceToY(p);
+            const y = Math.round(priceToY(p)) + 0.5;
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(chartW, y);
@@ -469,7 +516,7 @@ class TradingChartEngine {
     drawCandles(ctx, visibleCandles, startIndex, indexToX, priceToY) {
         if (!visibleCandles || visibleCandles.length === 0) return;
 
-        const wickWidth = Math.max(1.0, this.candleWidth > 12 ? 1.5 : 1.0);
+        const wickWidth = Math.max(1.0, this.candleWidth > 14 ? 1.5 : 1.0);
         const halfW = this.candleWidth / 2;
 
         const bullWicks = [];
@@ -482,9 +529,10 @@ class TradingChartEngine {
         for (let i = 0; i < visibleCandles.length; i++) {
             const c = visibleCandles[i];
             const idx = startIndex + i;
-            const x = indexToX(idx);
+            const x = Math.round(indexToX(idx));
             const open = c.open !== undefined ? c.open : c.getOpen();
-            const close = c.close !== undefined ? c.close : c.getClose();
+            // Use live interpolated price on active running candle
+            const close = (idx === totalCandles - 1 && this.livePrice > 0) ? this.livePrice : (c.close !== undefined ? c.close : c.getClose());
             const high = c.high !== undefined ? c.high : c.getHigh();
             const low = c.low !== undefined ? c.low : c.getLow();
 
@@ -494,7 +542,7 @@ class TradingChartEngine {
             const yHigh = priceToY(high);
             const yLow = priceToY(low);
 
-            const cx = x + halfW;
+            const cx = Math.round(x + halfW) + 0.5;
             const bodyY = Math.min(yOpen, yClose);
             const bodyH = Math.max(1.5, Math.abs(yOpen - yClose));
 
@@ -507,9 +555,9 @@ class TradingChartEngine {
             }
         }
 
-        // 1. Draw ALL Bullish Candles in 1 Single GPU Path (60-120 FPS)
+        // 1. TradingView Crisp Emerald Bullish Candles (#089981)
         if (bullWicks.length > 0) {
-            ctx.strokeStyle = '#10b981';
+            ctx.strokeStyle = '#089981';
             ctx.lineWidth = wickWidth;
             ctx.beginPath();
             for (let i = 0; i < bullWicks.length; i += 4) {
@@ -518,15 +566,15 @@ class TradingChartEngine {
             }
             ctx.stroke();
 
-            ctx.fillStyle = '#10b981';
+            ctx.fillStyle = '#089981';
             for (let i = 0; i < bullBodies.length; i += 4) {
                 ctx.fillRect(bullBodies[i], bullBodies[i + 1], bullBodies[i + 2], bullBodies[i + 3]);
             }
         }
 
-        // 2. Draw ALL Bearish Candles in 1 Single GPU Path
+        // 2. TradingView Crisp Coral Crimson Bearish Candles (#f23645)
         if (bearWicks.length > 0) {
-            ctx.strokeStyle = '#ef4444';
+            ctx.strokeStyle = '#f23645';
             ctx.lineWidth = wickWidth;
             ctx.beginPath();
             for (let i = 0; i < bearWicks.length; i += 4) {
@@ -535,7 +583,7 @@ class TradingChartEngine {
             }
             ctx.stroke();
 
-            ctx.fillStyle = '#ef4444';
+            ctx.fillStyle = '#f23645';
             for (let i = 0; i < bearBodies.length; i += 4) {
                 ctx.fillRect(bearBodies[i], bearBodies[i + 1], bearBodies[i + 2], bearBodies[i + 3]);
             }
@@ -902,94 +950,164 @@ class TradingChartEngine {
     }
 
     drawPriceAxis(ctx, chartW, chartH, minPrice, maxPrice, priceToY) {
-        ctx.fillStyle = '#0c111a';
+        // TradingView Dark Price Axis
+        ctx.fillStyle = '#131722';
         ctx.fillRect(chartW, 0, this.priceAxisWidth, chartH);
-        ctx.strokeStyle = '#1a2233';
+        ctx.strokeStyle = '#2a2e39';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(chartW, 0);
-        ctx.lineTo(chartW, chartH);
+        ctx.moveTo(chartW + 0.5, 0);
+        ctx.lineTo(chartW + 0.5, chartH);
         ctx.stroke();
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '11px JetBrains Mono';
+        ctx.fillStyle = '#787b86';
+        ctx.font = '500 11px JetBrains Mono, monospace';
         ctx.textAlign = 'left';
 
         const stepCount = 8;
         const stepVal = (maxPrice - minPrice) / stepCount;
         for (let i = 0; i <= stepCount; i++) {
             const p = minPrice + i * stepVal;
-            const y = priceToY(p);
+            const y = Math.round(priceToY(p));
+            // Tiny tick mark
+            ctx.strokeStyle = '#2a2e39';
+            ctx.beginPath();
+            ctx.moveTo(chartW, y + 0.5);
+            ctx.lineTo(chartW + 4, y + 0.5);
+            ctx.stroke();
+
             ctx.fillText(p.toFixed(p > 500 ? 2 : 4), chartW + 8, y + 4);
         }
     }
 
     drawTimeAxis(ctx, chartW, chartH, visibleCandles, startIndex, indexToX) {
-        ctx.fillStyle = '#0c111a';
+        // TradingView Dark Time Axis
+        ctx.fillStyle = '#131722';
         ctx.fillRect(0, chartH, chartW, this.timeAxisHeight);
-        ctx.strokeStyle = '#1a2233';
+        ctx.strokeStyle = '#2a2e39';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(0, chartH);
-        ctx.lineTo(chartW, chartH);
+        ctx.moveTo(0, chartH + 0.5);
+        ctx.lineTo(chartW, chartH + 0.5);
         ctx.stroke();
 
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px JetBrains Mono';
+        ctx.fillStyle = '#787b86';
+        ctx.font = '500 10.5px JetBrains Mono, monospace';
         ctx.textAlign = 'center';
 
         const timeStep = Math.max(1, Math.floor(visibleCandles.length / 6));
         for (let i = 0; i < visibleCandles.length; i += timeStep) {
             const c = visibleCandles[i];
-            const x = indexToX(startIndex + i) + (this.candleWidth / 2);
+            const x = Math.round(indexToX(startIndex + i) + (this.candleWidth / 2));
             const ts = c.timestamp !== undefined ? c.timestamp : c.getTimestamp();
             const date = new Date(ts);
             const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            
+            // Tiny tick mark
+            ctx.strokeStyle = '#2a2e39';
+            ctx.beginPath();
+            ctx.moveTo(x + 0.5, chartH);
+            ctx.lineTo(x + 0.5, chartH + 4);
+            ctx.stroke();
+
             ctx.fillText(timeStr, x, chartH + 18);
         }
     }
 
-    drawCurrentPriceLine(ctx, chartW, currentPrice, priceToY) {
-        const y = priceToY(currentPrice);
-        ctx.strokeStyle = '#00f2fe';
+    drawCurrentPriceLine(ctx, chartW, currentPrice, openPrice, runningCandleX, priceToY) {
+        const y = Math.round(priceToY(currentPrice)) + 0.5;
+        const isBull = currentPrice >= openPrice;
+        const priceColor = isBull ? '#089981' : '#f23645';
+
+        // 1. TradingView Dashed Live Price Line
+        ctx.strokeStyle = priceColor;
         ctx.lineWidth = 1.2;
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([4, 3]);
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(chartW, y);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = '#00f2fe';
-        ctx.fillRect(chartW, y - 10, this.priceAxisWidth, 20);
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 11px JetBrains Mono';
+        // 2. Pulsating Live Beacon Dot on active candle edge
+        if (runningCandleX && runningCandleX > 0 && runningCandleX < chartW) {
+            const pulseRadius = 3.5 + Math.sin(this.pulsePhase) * 1.5;
+            const haloRadius = 7 + Math.sin(this.pulsePhase) * 3;
+
+            // Halo glow
+            ctx.beginPath();
+            ctx.arc(runningCandleX, y, haloRadius, 0, Math.PI * 2);
+            ctx.fillStyle = isBull ? 'rgba(8, 153, 129, 0.25)' : 'rgba(242, 54, 69, 0.25)';
+            ctx.fill();
+
+            // Core beacon dot
+            ctx.beginPath();
+            ctx.arc(runningCandleX, y, pulseRadius, 0, Math.PI * 2);
+            ctx.fillStyle = priceColor;
+            ctx.fill();
+        }
+
+        // 3. TradingView Price Axis Pill
+        const pillW = this.priceAxisWidth - 6;
+        const pillH = 19;
+        const pillX = chartW + 3;
+        const pillY = y - (pillH / 2);
+
+        ctx.fillStyle = priceColor;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+        } else {
+            ctx.rect(pillX, pillY, pillW, pillH);
+        }
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px JetBrains Mono, monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(currentPrice.toFixed(currentPrice > 500 ? 2 : 4), chartW + 6, y + 4);
+        ctx.fillText(currentPrice.toFixed(currentPrice > 500 ? 2 : 4), pillX + 6, y + 4);
     }
 
-    drawCrosshair(ctx, chartW, chartH, x, y, yToPrice) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    drawCrosshair(ctx, chartW, chartH, x, y, yToPrice, indexToX, visibleCandles, startIndex) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.40)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
 
+        // Vertical Time Line
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, chartH);
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, chartH);
         ctx.stroke();
 
+        // Horizontal Price Line
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(chartW, y);
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(chartW, y + 0.5);
         ctx.stroke();
         ctx.setLineDash([]);
 
+        // Floating Dark Price Pill on Y Axis
         const price = yToPrice(y);
-        ctx.fillStyle = '#1a2233';
-        ctx.fillRect(chartW, y - 9, this.priceAxisWidth, 18);
+        const pillW = this.priceAxisWidth - 6;
+        const pillH = 18;
+        const pillX = chartW + 3;
+        const pillY = y - (pillH / 2);
+
+        ctx.fillStyle = '#2a2e39';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(pillX, pillY, pillW, pillH, 3);
+        } else {
+            ctx.rect(pillX, pillY, pillW, pillH);
+        }
+        ctx.fill();
+        ctx.stroke();
+
         ctx.fillStyle = '#ffffff';
-        ctx.font = '10px JetBrains Mono';
+        ctx.font = '500 10.5px JetBrains Mono, monospace';
         ctx.textAlign = 'left';
-        ctx.fillText(price.toFixed(price > 500 ? 2 : 4), chartW + 6, y + 4);
+        ctx.fillText(price.toFixed(price > 500 ? 2 : 4), pillX + 6, y + 4);
     }
 }
