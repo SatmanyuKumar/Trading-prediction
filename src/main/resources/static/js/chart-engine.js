@@ -27,13 +27,13 @@ class TradingChartEngine {
         this.ema200 = [];
         this.tradeSetup = null;
 
-        // Display Toggles
+        // Display Toggles (Default Clean View: SL/TP Target Only)
         this.flags = {
-            fvg: true,
-            ob: true,
-            sr: true,
-            bos: true,
-            ema: true,
+            fvg: false,
+            ob: false,
+            sr: false,
+            bos: false,
+            ema: false,
             setup: true
         };
 

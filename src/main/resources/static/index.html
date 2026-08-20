@@ -24,11 +24,6 @@
             </div>
             
             <div class="header-action-pills">
-                <a href="/Trading_Terminal_Engineering_Whitepaper.pdf" target="_blank" download="Trading_Terminal_Engineering_Whitepaper.pdf" class="backtest-header-pill" title="Download Complete Engineering Whitepaper PDF (Concepts, Architecture & Problem Solving Documentation)" style="text-decoration: none; color: inherit;">
-                    <span class="btn-icon">📄</span>
-                    <span class="btn-text">Engineering Whitepaper (PDF)</span>
-                </a>
-
                 <button class="backtest-header-pill" id="btn-open-backtest-modal" title="Run institutional backtest over historical candles">
                     <span class="btn-icon">📊</span>
                     <span class="btn-text">Strategy Backtest Engine</span>
@@ -44,34 +39,6 @@
                     <span class="broker-name" id="vantage-status-text">VANTAGE MT5: CONNECT</span>
                     <span class="broker-dot pulse-dot" id="vantage-status-dot"></span>
                 </div>
-            </div>
-        </div>
-
-        <div class="market-ticker-strip" id="ticker-strip">
-            <div class="ticker-item active" data-pair="XAUUSD" data-tv="OANDA:XAUUSD">
-                <span class="ticker-symbol">XAU/USD</span>
-                <span class="ticker-price" id="tick-XAUUSD">Gold Spot</span>
-                <span class="ticker-change up">Live</span>
-            </div>
-            <div class="ticker-item" data-pair="EURUSD" data-tv="FX:EURUSD">
-                <span class="ticker-symbol">EUR/USD</span>
-                <span class="ticker-price" id="tick-EURUSD">Euro</span>
-                <span class="ticker-change up">Live</span>
-            </div>
-            <div class="ticker-item" data-pair="GBPUSD" data-tv="FX:GBPUSD">
-                <span class="ticker-symbol">GBP/USD</span>
-                <span class="ticker-price" id="tick-GBPUSD">Pound</span>
-                <span class="ticker-change up">Live</span>
-            </div>
-            <div class="ticker-item" data-pair="USDJPY" data-tv="FX:USDJPY">
-                <span class="ticker-symbol">USD/JPY</span>
-                <span class="ticker-price" id="tick-USDJPY">Yen</span>
-                <span class="ticker-change up">Live</span>
-            </div>
-            <div class="ticker-item" data-pair="BTCUSD" data-tv="BINANCE:BTCUSDT">
-                <span class="ticker-symbol">BTC/USD</span>
-                <span class="ticker-price" id="tick-BTCUSD">Bitcoin</span>
-                <span class="ticker-change up">Live</span>
             </div>
         </div>
     </header>
@@ -120,36 +87,36 @@
                 </div>
             </div>
 
-            <!-- Interactive SMC Checkboxes Bar -->
+            <!-- Interactive SMC Checkboxes Bar (Default: Clean SL/TP Target Only) -->
             <div class="indicators-checkbox-bar">
                 <span class="checkbox-bar-label">📊 Overlays:</span>
                 
                 <label class="smc-checkbox-item" title="Draws nearest untouched Fair Value Gap boxes with 50% midpoint line directly on the chart">
-                    <input type="checkbox" id="chk-fvg" checked>
+                    <input type="checkbox" id="chk-fvg">
                     <span class="custom-check fvg-badge"></span>
                     <span class="check-text">FVG (50% C.E.)</span>
                 </label>
 
                 <label class="smc-checkbox-item" title="Draws institutional Order Block demand/supply boxes directly on the chart">
-                    <input type="checkbox" id="chk-ob" checked>
+                    <input type="checkbox" id="chk-ob">
                     <span class="custom-check ob-badge"></span>
                     <span class="check-text">Order Blocks (OB)</span>
                 </label>
 
                 <label class="smc-checkbox-item" title="Draws Support & Resistance horizontal lines on the chart">
-                    <input type="checkbox" id="chk-sr" checked>
+                    <input type="checkbox" id="chk-sr">
                     <span class="custom-check sr-badge"></span>
                     <span class="check-text">Support / Resistance</span>
                 </label>
 
                 <label class="smc-checkbox-item" title="Draws Break of Structure breakout lines on the chart">
-                    <input type="checkbox" id="chk-bos" checked>
+                    <input type="checkbox" id="chk-bos">
                     <span class="custom-check bos-badge"></span>
                     <span class="check-text">Structure (BOS)</span>
                 </label>
 
                 <label class="smc-checkbox-item" title="Draws 20, 50, 200 Exponential Moving Average lines on the chart">
-                    <input type="checkbox" id="chk-ema" checked>
+                    <input type="checkbox" id="chk-ema">
                     <span class="custom-check ema-badge"></span>
                     <span class="check-text">EMAs (20/50/200)</span>
                 </label>
@@ -867,7 +834,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart-engine.js?v=4.1"></script>
-    <script src="js/app.js?v=4.1"></script>
+    <script src="js/chart-engine.js?v=4.2"></script>
+    <script src="js/app.js?v=4.2"></script>
 </body>
 </html>
