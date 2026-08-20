@@ -576,14 +576,28 @@ public class SmcAnalysisService {
         int confidence = 85;
 
         // =========================================================================
-        // 🏛️ INSTITUTIONAL DECISION ENGINE (4 Core Market Delivery Phases)
+        // 🏛️ INSTITUTIONAL ORDER FLOW & TREND CLASSIFICATION ENGINE
+        // Rule: NEVER trade counter-trend! Trade with Higher Timeframe Order Flow.
         // =========================================================================
+        boolean isBullishTrend = (e20 >= e50 && currentPrice >= e50) || (e50 >= e200 && currentPrice >= e20);
+        boolean isBearishTrend = (e20 <= e50 && currentPrice <= e50) || (e50 <= e200 && currentPrice <= e20);
 
-        // PHASE 1: OVERHEAD SUPPLY REVERSAL (Short from Overhead Bearish FVG / BSL Exhaustion)
-        // Triggered when price has rallied into Premium (>= 58%) OR is tapping Overhead Supply within 1.5% distance
-        boolean isOverheadReversal = pricePositionPct >= 58.0 || distToOverheadSupplyPct <= 1.2 || rsi14 >= 62.0;
+        boolean isBuySignal;
+        if (isBullishTrend && !isBearishTrend) {
+            // Trend is Bullish -> Strict BUY ON PULLBACK to Demand FVG
+            isBuySignal = true;
+        } else if (isBearishTrend && !isBullishTrend) {
+            // Trend is Bearish -> Strict SELL ON PULLBACK to Supply FVG
+            isBuySignal = false;
+        } else {
+            // Consolidation/Equilibrium: Trade towards nearest unmitigated liquidity
+            isBuySignal = pricePositionPct <= 50.0;
+        }
 
-        if (isOverheadReversal) {
+        if (!isBuySignal) {
+            // =========================================================================
+            // 🔴 INSTITUTIONAL SELL SETUP (Trend-Aligned Short from Premium Supply FVG)
+            // =========================================================================
             double entry = overheadSupplyLevel;
             double structuralHigh = Math.max(entry, rangeHigh);
             double stopLoss = round(structuralHigh + dynamicAtrBuffer + spread, 5);
@@ -593,34 +607,33 @@ public class SmcAnalysisService {
             double tp1 = round(entry - (risk * tp1Multiplier), 5);
             double tp2 = round(entry - (risk * tp2Multiplier), 5);
 
-            confidence = (nearestOverheadFvg != null && pricePositionPct >= 70.0) ? (isSwing ? 96 : 92) : (isSwing ? 90 : 86);
+            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSwing ? 96 : 92) : (isSwing ? 90 : 86);
 
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-            confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Trend Invalidation" : "⚡ Scalp / Intraday Momentum"));
-            confluences.add("🏛️ Institutional Delivery: Market expanded up to tap Overhead Bearish Supply / Imbalance");
-            confluences.add(nearestOverheadFvg != null ? "Untouched 50% Consequent Encroachment (C.E.) of Macro Overhead FVG: " + formatPrice(overheadSupplyLevel, symbol) : "Macro Range High Liquidity Pool (BSL Sweep)");
-            confluences.add("Premium Positioning: Trading at " + String.format("%.1f", pricePositionPct) + "% of Macro Range (Distribution Zone)");
-            confluences.add("RSI Overextension: RSI=" + String.format("%.1f", rsi14) + " (Exhaustion Reversal Magnet)");
+            confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Trend Continuation" : "⚡ Scalp / Intraday Momentum"));
+            confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
+            confluences.add(nearestOverheadFvg != null ? "50% Consequent Encroachment (C.E.) Supply Retest: " + formatPrice(overheadSupplyLevel, symbol) : "Macro Supply Liquidity Pool");
+            confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
+            confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
             confluences.add("Target Risk-to-Reward: 1:" + targetRr + " (Asymmetric Short Expectancy)");
 
             String setupTitle = isSwing 
-                ? "🎯 4H/Macro Overhead Reversal: Bearish Supply & FVG Mitigation" 
-                : "⚡ Scalp Overhead Rejection: Quick Supply Tap & Short Drop";
+                ? "🎯 4H/Macro Bearish Trend: Supply Pullback targeting Downside Demand" 
+                : "⚡ Scalp Supply Tap: High-Probability Short Rejection";
 
             String bookExplanation = String.format(
-                "### 📚 %s (ICT / Wyckoff Distribution Blueprint)\n\n" +
-                "1. **Macro Overhead Supply Mitigation:**\n" +
-                "   After an extended upward run on the %s timeframe, price is testing the **Overhead Bearish Supply FVG / BSL Pool at %s**.\n\n" +
-                "2. **Smart Money Distribution Logic (Mark Douglas / ICT):**\n" +
-                "   Institutions do not chase rallies in extreme Premium (%s). They distribute long positions and initiate short inventory at the 50%% Consequent Encroachment.\n\n" +
+                "### 📚 %s (ICT Bearish Order Flow Blueprint)\n\n" +
+                "1. **Institutional Market Direction:**\n" +
+                "   Market structure on %s is in **Bearish Trend Alignment** seeking downside Discount Liquidity.\n\n" +
+                "2. **Premium Supply Entry Coordination:**\n" +
+                "   Smart money waits for a pullback into the **Overhead Bearish Supply FVG at %s** to initiate short inventory.\n\n" +
                 "3. **Entry Coordinates & Buffer:**\n" +
                 "   Short entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
-                "4. **Target & Liquidity Horizons:**\n" +
-                "   Take Profit 1 at **%s** and Take Profit 2 at **%s** targeting Mean Reversion back to 50%% Equilibrium at **1:%.1f R:R**.\n",
-                isSwing ? "🌊 Macro Overhead Reversal Blueprint" : "⚡ Intraday Supply Rejection",
+                "4. **Target Horizons:**\n" +
+                "   Take Profit 1 at **%s** and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
+                isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap",
                 timeframe,
                 formatPrice(overheadSupplyLevel, symbol),
-                String.format("%.1f%% Range High", pricePositionPct),
                 formatPrice(entry, symbol),
                 formatPrice(stopLoss, symbol),
                 atrMultiplier,
@@ -646,75 +659,75 @@ public class SmcAnalysisService {
                     bookExplanation,
                     System.currentTimeMillis()
             );
-        }
+        } else {
+            // =========================================================================
+            // 🟢 INSTITUTIONAL BUY SETUP (Trend-Aligned Long from Discount Demand FVG)
+            // =========================================================================
+            double entry = underneathDemandLevel + spread;
+            double structuralLow = Math.min(entry, rangeLow);
+            double stopLoss = round(structuralLow - dynamicAtrBuffer, 5);
+            double risk = Math.max(minBuffer, Math.abs(entry - stopLoss));
+            stopLoss = round(entry - risk, 5);
 
-        // PHASE 2: BULLISH PULLBACK TO DEMAND TARGETING OVERHEAD SUPPLY (Expansion Long)
-        // Triggered when price is in Discount / Mid-Range (< 58%) expanding upwards towards Overhead Supply
-        double entry = underneathDemandLevel + spread;
-        double structuralLow = Math.min(entry, rangeLow);
-        double stopLoss = round(structuralLow - dynamicAtrBuffer, 5);
-        double risk = Math.max(minBuffer, Math.abs(entry - stopLoss));
-        stopLoss = round(entry - risk, 5);
+            double idealTp1 = Math.max(entry + (risk * tp1Multiplier), overheadSupplyLevel);
+            double tp1 = round(idealTp1, 5);
+            double tp2 = round(entry + (risk * tp2Multiplier), 5);
+            double calculatedRr = round(Math.abs(tp1 - entry) / risk, 1);
 
-        // Take Profit 1 is anchored to the Overhead Supply Level or 1:3+ R:R (whichever is greater)
-        double idealTp1 = Math.max(entry + (risk * tp1Multiplier), overheadSupplyLevel);
-        double tp1 = round(idealTp1, 5);
-        double tp2 = round(entry + (risk * tp2Multiplier), 5);
-        double calculatedRr = round(Math.abs(tp1 - entry) / risk, 1);
+            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSwing ? 96 : 92) : (isSwing ? 90 : 86);
 
-        confidence = (nearestUnderneathFvg != null && pricePositionPct <= 45.0) ? (isSwing ? 95 : 91) : (isSwing ? 89 : 85);
+            confluences.add("Timeframe Reliability: " + tfReliabilityTag);
+            confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Bullish Expansion" : "⚡ Scalp / Intraday Momentum"));
+            confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
+            confluences.add(nearestUnderneathFvg != null ? "50% Consequent Encroachment (C.E.) Demand Retest: " + formatPrice(underneathDemandLevel, symbol) : "Discount Equilibrium Accumulation Retest");
+            confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
+            confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
+            confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Asymmetric Expectancy)");
 
-        confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-        confluences.add("Mode: " + (isSwing ? "🌊 Swing / Macro Trend Invalidation" : "⚡ Scalp / Intraday Momentum"));
-        confluences.add("🏛️ Institutional Delivery: Bullish Expansion targeting Macro Overhead Supply FVG");
-        confluences.add(nearestUnderneathFvg != null ? "50% Consequent Encroachment (C.E.) Demand Retest: " + formatPrice(underneathDemandLevel, symbol) : "Discount Equilibrium Accumulation Retest");
-        confluences.add("Overhead Target Magnet: Bearish Supply / BSL at " + formatPrice(overheadSupplyLevel, symbol));
-        confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Expansion Slope)");
-        confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Asymmetric Expectancy)");
+            String setupTitle = isSwing 
+                ? "🚀 4H/Macro Bullish Expansion: Demand Pullback targeting Overhead Supply" 
+                : "⚡ Scalp Demand Tap: Rapid Push towards Overhead Liquidity";
 
-        String setupTitle = isSwing 
-            ? "🚀 4H/Macro Bullish Expansion: Demand Pullback targeting Overhead Supply" 
-            : "⚡ Scalp Demand Tap: Rapid Push towards Overhead Liquidity";
-
-        String bookExplanation = String.format(
-            "### 📚 %s (ICT OTE & Expansion Blueprint)\n\n" +
-            "1. **Institutional Target Magnet:**\n" +
-            "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply FVG at %s**.\n\n" +
-            "2. **Discount Entry Coordination:**\n" +
-            "   Smart money waits for a pullback into the **Discount Bullish Demand zone at %s** to enter with low risk.\n\n" +
-            "3. **Entry Coordinates & Buffer:**\n" +
-            "   Buy entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
-            "4. **Target Horizons:**\n" +
-            "   Take Profit 1 at **%s** (Overhead Target) and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
-            isSwing ? "🌊 Macro Expansion Blueprint" : "⚡ Intraday Demand Expansion",
-            timeframe,
-            formatPrice(overheadSupplyLevel, symbol),
-            formatPrice(underneathDemandLevel, symbol),
-            formatPrice(entry, symbol),
-            formatPrice(stopLoss, symbol),
-            atrMultiplier,
-            formatPrice(tp1, symbol),
-            formatPrice(tp2, symbol),
-            calculatedRr
-        );
-
-        return new TradeSetup(
-                "SETUP-EXPANSION-BUY-" + System.currentTimeMillis(),
-                symbol,
+            String bookExplanation = String.format(
+                "### 📚 %s (ICT OTE & Bullish Expansion Blueprint)\n\n" +
+                "1. **Institutional Target Magnet:**\n" +
+                "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply FVG at %s**.\n\n" +
+                "2. **Discount Entry Coordination:**\n" +
+                "   Smart money waits for a pullback into the **Discount Bullish Demand zone at %s** to enter with low risk.\n\n" +
+                "3. **Entry Coordinates & Buffer:**\n" +
+                "   Buy entry waiting at **%s** with a dynamic stop loss buffered at **%s** (%.1f× ATR volatility protection).\n\n" +
+                "4. **Target Horizons:**\n" +
+                "   Take Profit 1 at **%s** (Overhead Target) and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
+                isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion",
                 timeframe,
-                "BUY",
-                confidence,
-                currentPrice,
-                entry,
-                stopLoss,
-                tp1,
-                tp2,
-                calculatedRr,
-                setupTitle,
-                confluences,
-                bookExplanation,
-                System.currentTimeMillis()
-        );
+                formatPrice(overheadSupplyLevel, symbol),
+                formatPrice(underneathDemandLevel, symbol),
+                formatPrice(entry, symbol),
+                formatPrice(stopLoss, symbol),
+                atrMultiplier,
+                formatPrice(tp1, symbol),
+                formatPrice(tp2, symbol),
+                calculatedRr
+            );
+
+            return new TradeSetup(
+                    "SETUP-EXPANSION-BUY-" + System.currentTimeMillis(),
+                    symbol,
+                    timeframe,
+                    "BUY",
+                    confidence,
+                    currentPrice,
+                    entry,
+                    stopLoss,
+                    tp1,
+                    tp2,
+                    calculatedRr,
+                    setupTitle,
+                    confluences,
+                    bookExplanation,
+                    System.currentTimeMillis()
+            );
+        }
     }
 
     private double calculate24hChange(List<Candle> candles) {
