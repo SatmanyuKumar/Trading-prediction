@@ -787,20 +787,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (valRr) valRr.textContent = '1 : ' + setup.riskRewardRatio;
         }
 
-        // Live Trade Entered Box Time formatting
+        // Live Trade Entered Box Time formatting (Triggered vs Still Waiting/Pending)
         const signalTimeBadge = document.getElementById('signal-time-badge');
         const valSetupTime = document.getElementById('val-setup-time');
         const valSetupElapsed = document.getElementById('val-setup-elapsed');
 
-        if (setup && setup.timestamp && !isHold) {
-            state.activeSetupTimestamp = setup.timestamp;
-            const t = new Date(setup.timestamp);
-            const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-            if (valSetupTime) valSetupTime.textContent = timeStr;
+        if (setup && !isHold) {
+            state.activeSetupTriggered = setup.triggered;
+            state.activeSetupTriggeredTimestamp = setup.triggeredTimestamp || 0;
+            state.activeSetupCreatedTimestamp = setup.timestamp || setup.startTimestamp || Date.now();
+            state.activeSetupEntryPrice = setup.entryPrice;
+            state.activeSetupSymbol = setup.symbol;
+
             updateSetupElapsedTime();
             if (signalTimeBadge) signalTimeBadge.style.display = 'inline-flex';
         } else {
-            state.activeSetupTimestamp = null;
+            state.activeSetupTriggered = false;
+            state.activeSetupTriggeredTimestamp = 0;
+            state.activeSetupCreatedTimestamp = null;
             if (signalTimeBadge) signalTimeBadge.style.display = 'none';
         }
 
@@ -2042,19 +2046,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 800);
 
     function updateSetupElapsedTime() {
-        if (!state.activeSetupTimestamp) return;
+        const signalTimeBadge = document.getElementById('signal-time-badge');
+        const valSetupTime = document.getElementById('val-setup-time');
         const valSetupElapsed = document.getElementById('val-setup-elapsed');
-        if (!valSetupElapsed) return;
-        const elapsedSec = Math.max(0, Math.floor((Date.now() - state.activeSetupTimestamp) / 1000));
-        let elapsedStr = '';
-        if (elapsedSec < 60) {
-            elapsedStr = `(${elapsedSec}s ago)`;
-        } else if (elapsedSec < 3600) {
-            elapsedStr = `(${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s ago)`;
-        } else {
-            elapsedStr = `(${Math.floor(elapsedSec / 3600)}h ${Math.floor((elapsedSec % 3600) / 60)}m ago)`;
+        if (!signalTimeBadge || !valSetupTime || !valSetupElapsed) return;
+
+        if (!state.activeSetupCreatedTimestamp) {
+            signalTimeBadge.style.display = 'none';
+            return;
         }
-        valSetupElapsed.textContent = elapsedStr;
+
+        if (state.activeSetupTriggered && state.activeSetupTriggeredTimestamp > 0) {
+            // State: Trade Entered / Filled Execution Box
+            const t = new Date(state.activeSetupTriggeredTimestamp);
+            const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            
+            valSetupTime.textContent = timeStr;
+            valSetupTime.style.color = '#34d399';
+
+            const elapsedSec = Math.max(0, Math.floor((Date.now() - state.activeSetupTriggeredTimestamp) / 1000));
+            let elapsedStr = '';
+            if (elapsedSec < 60) {
+                elapsedStr = `(${elapsedSec}s in trade)`;
+            } else if (elapsedSec < 3600) {
+                elapsedStr = `(${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s in trade)`;
+            } else {
+                elapsedStr = `(${Math.floor(elapsedSec / 3600)}h ${Math.floor((elapsedSec % 3600) / 60)}m in trade)`;
+            }
+            valSetupElapsed.textContent = elapsedStr;
+            valSetupElapsed.style.color = '#6ee7b7';
+
+            signalTimeBadge.style.background = 'rgba(6, 78, 59, 0.45)';
+            signalTimeBadge.style.borderColor = 'rgba(52, 211, 153, 0.5)';
+            signalTimeBadge.style.color = '#34d399';
+            const labelSpan = signalTimeBadge.querySelector('span:first-child');
+            if (labelSpan) labelSpan.textContent = '⚡ In-Box Since:';
+        } else {
+            // State: Waiting / Pending Retest Tap
+            valSetupTime.textContent = 'Still Waiting Tap';
+            valSetupTime.style.color = '#fbbf24';
+
+            const entryStr = state.activeSetupEntryPrice ? `@ ${formatPrice(state.activeSetupEntryPrice, state.activeSetupSymbol)}` : 'for retest';
+            valSetupElapsed.textContent = `(${entryStr})`;
+            valSetupElapsed.style.color = '#fde68a';
+
+            signalTimeBadge.style.background = 'rgba(120, 53, 15, 0.35)';
+            signalTimeBadge.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+            signalTimeBadge.style.color = '#fbbf24';
+            const labelSpan = signalTimeBadge.querySelector('span:first-child');
+            if (labelSpan) labelSpan.textContent = '⏳ Execution Status:';
+        }
     }
 
     setInterval(() => {

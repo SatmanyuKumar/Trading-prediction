@@ -22,6 +22,8 @@ public class TradeSetup {
     private String status = "ACTIVE"; // "ACTIVE", "FAILED_SL", "FAILED_TREND_SHIFT", "TP_HIT"
     private long startTimestamp;
     private long endTimestamp;
+    private boolean triggered;
+    private long triggeredTimestamp;
 
     public TradeSetup() {}
 
@@ -110,4 +112,10 @@ public class TradeSetup {
 
     public long getEndTimestamp() { return endTimestamp; }
     public void setEndTimestamp(long endTimestamp) { this.endTimestamp = endTimestamp; }
+
+    public boolean isTriggered() { return triggered; }
+    public void setTriggered(boolean triggered) { this.triggered = triggered; }
+
+    public long getTriggeredTimestamp() { return triggeredTimestamp; }
+    public void setTriggeredTimestamp(long triggeredTimestamp) { this.triggeredTimestamp = triggeredTimestamp; }
 }

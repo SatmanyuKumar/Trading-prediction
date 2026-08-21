@@ -98,6 +98,25 @@ public class SmcAnalysisService {
                 trendShift = true;
             }
 
+            // Check if trade entered / filled the execution box
+            if (!active.isTriggered()) {
+                boolean filled = false;
+                for (int i = checkStart; i < candles.size(); i++) {
+                    Candle c = candles.get(i);
+                    if (c.getTimestamp() >= active.getTimestamp() - 2000) {
+                        if (isBuy && c.getLow() <= active.getEntryPrice()) filled = true;
+                        if (!isBuy && c.getHigh() >= active.getEntryPrice()) filled = true;
+                    }
+                }
+                if (isBuy && currentPrice <= active.getEntryPrice()) filled = true;
+                if (!isBuy && currentPrice >= active.getEntryPrice()) filled = true;
+
+                if (filled) {
+                    active.setTriggered(true);
+                    active.setTriggeredTimestamp(System.currentTimeMillis());
+                }
+            }
+
             if (slHit || tpHit || trendShift) {
                 // Setup is resolved -> Archive and allow next structural setup to appear!
                 String resolutionStatus = tpHit ? "TP_HIT" : (trendShift ? "FAILED_TREND_SHIFT" : "FAILED_SL");
@@ -115,6 +134,11 @@ public class SmcAnalysisService {
                 if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
                     setup.setStartTimestamp(System.currentTimeMillis());
                     setup.setStatus("ACTIVE");
+                    boolean initialFilled = "BUY".equalsIgnoreCase(setup.getSignal()) 
+                        ? currentPrice <= setup.getEntryPrice() 
+                        : currentPrice >= setup.getEntryPrice();
+                    setup.setTriggered(initialFilled);
+                    setup.setTriggeredTimestamp(initialFilled ? System.currentTimeMillis() : 0);
                     activeLockedSetups.put(setupKey, setup);
                 }
             } else {
@@ -129,6 +153,11 @@ public class SmcAnalysisService {
             if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
                 setup.setStartTimestamp(System.currentTimeMillis());
                 setup.setStatus("ACTIVE");
+                boolean initialFilled = "BUY".equalsIgnoreCase(setup.getSignal()) 
+                    ? currentPrice <= setup.getEntryPrice() 
+                    : currentPrice >= setup.getEntryPrice();
+                setup.setTriggered(initialFilled);
+                setup.setTriggeredTimestamp(initialFilled ? System.currentTimeMillis() : 0);
                 activeLockedSetups.put(setupKey, setup);
             }
         }
