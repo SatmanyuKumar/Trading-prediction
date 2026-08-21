@@ -92,7 +92,7 @@ class TradingChartEngine {
             const chartW = this.displayWidth - this.priceAxisWidth;
             const chartH = this.displayHeight - this.timeAxisHeight;
 
-            if (x >= chartW) {
+            if (x >= (chartW - 20)) {
                 // Dragging Price Axis -> Smooth Vertical Height Scaling
                 this.isDraggingPriceAxis = true;
                 this.dragStartY = e.clientY;
@@ -134,7 +134,7 @@ class TradingChartEngine {
                 this.canvas.style.cursor = 'ew-resize';
             } else if (this.isDragging) {
                 this.canvas.style.cursor = 'grabbing';
-            } else if (this.mouseX >= chartW) {
+            } else if (this.mouseX >= (chartW - 20)) {
                 this.canvas.style.cursor = 'ns-resize';
             } else if (this.mouseY >= chartH) {
                 this.canvas.style.cursor = 'ew-resize';
@@ -190,9 +190,10 @@ class TradingChartEngine {
             const chartH = this.displayHeight - this.timeAxisHeight;
 
             // 1. Mouse Roller on RIGHT PRICE AXIS (Side Scale Vertical Stretch/Compress)
-            if (mouseX >= chartW) {
-                const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.verticalScaleMultiplier * zoomFactor));
+            // Just point mouse at candle values on right side and scroll wheel -> Zooms candle height instantly!
+            if (mouseX >= (chartW - 20)) {
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                this.verticalScaleMultiplier = Math.max(0.05, Math.min(25.0, this.verticalScaleMultiplier * zoomFactor));
                 this.requestRender();
                 return;
             }
