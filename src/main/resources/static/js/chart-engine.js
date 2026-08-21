@@ -128,12 +128,16 @@ class TradingChartEngine {
             const chartH = this.displayHeight - this.timeAxisHeight;
 
             // Cursor styling based on hover area
-            if (this.mouseX >= chartW) {
+            if (this.isDraggingPriceAxis) {
                 this.canvas.style.cursor = 'ns-resize';
-            } else if (this.mouseY >= chartH) {
+            } else if (this.isDraggingTimeAxis) {
                 this.canvas.style.cursor = 'ew-resize';
             } else if (this.isDragging) {
                 this.canvas.style.cursor = 'grabbing';
+            } else if (this.mouseX >= chartW) {
+                this.canvas.style.cursor = 'ns-resize';
+            } else if (this.mouseY >= chartH) {
+                this.canvas.style.cursor = 'ew-resize';
             } else {
                 this.canvas.style.cursor = 'crosshair';
             }
@@ -155,14 +159,15 @@ class TradingChartEngine {
                 this.requestRender();
             } else if (this.isDraggingPriceAxis) {
                 const deltaY = this.dragStartY - e.clientY;
-                const factor = 1.0 + (deltaY / 180.0);
-                this.verticalScaleMultiplier = Math.max(0.15, Math.min(6.0, this.initialVerticalScale * factor));
+                const factor = Math.exp(deltaY / 140.0);
+                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.initialVerticalScale * factor));
                 this.requestRender();
             } else if (this.isDraggingTimeAxis) {
-                const deltaX = this.dragStartX - e.clientX;
-                const factor = 1.0 + (deltaX / 250.0);
-                this.candleWidth = Math.max(2.5, Math.min(45.0, this.initialCandleWidth / factor));
+                const deltaX = e.clientX - this.dragStartX;
+                const factor = Math.exp(deltaX / 180.0);
+                this.candleWidth = Math.max(2.0, Math.min(60.0, this.initialCandleWidth * factor));
                 this.candleGap = Math.max(1.0, this.candleWidth * 0.4);
+                this.clampPanOffset();
                 this.requestRender();
             } else {
                 this.requestRender();
@@ -175,19 +180,57 @@ class TradingChartEngine {
             this.requestRender();
         });
 
-        // Buttery Smooth Cursor-Anchored Wheel Zoom
+        // 🎯 TRADINGVIEW AUTHENTIC MOUSE ROLLER (WHEEL) & SCALE CONTROLS
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
             const chartW = this.displayWidth - this.priceAxisWidth;
+            const chartH = this.displayHeight - this.timeAxisHeight;
 
-            if (mouseX < 0 || mouseX > chartW) return;
+            // 1. Mouse Roller on RIGHT PRICE AXIS (Side Scale Vertical Stretch/Compress)
+            if (mouseX >= chartW) {
+                const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.verticalScaleMultiplier * zoomFactor));
+                this.requestRender();
+                return;
+            }
 
-            // Zoom intensity factor
+            // 2. Mouse Roller on BOTTOM TIME AXIS (Horizontal Time Stretch/Compress)
+            if (mouseY >= chartH) {
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                const prevWidth = this.candleWidth;
+                const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
+                if (prevWidth !== newWidth) {
+                    this.candleWidth = newWidth;
+                    this.candleGap = Math.max(1.0, newWidth * 0.4);
+                    this.clampPanOffset();
+                    this.requestRender();
+                }
+                return;
+            }
+
+            // 3. Mouse Roller with Modifier Keys (Shift = Horizontal Pan, Ctrl = Vertical Scale)
+            if (e.shiftKey) {
+                const panStep = (e.deltaY || e.deltaX) > 0 ? -3.0 : 3.0;
+                this.panOffset += panStep;
+                this.clampPanOffset();
+                this.requestRender();
+                return;
+            }
+
+            if (e.ctrlKey || e.metaKey) {
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.verticalScaleMultiplier * zoomFactor));
+                this.requestRender();
+                return;
+            }
+
+            // 4. Default TradingView Cursor-Anchored Canvas Zoom
             const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
             const prevWidth = this.candleWidth;
-            const newWidth = Math.max(2.5, Math.min(45.0, prevWidth * zoomFactor));
+            const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
 
             if (prevWidth !== newWidth) {
                 const stepPrev = prevWidth + this.candleGap;
@@ -204,9 +247,27 @@ class TradingChartEngine {
             }
         }, { passive: false });
 
-        // Double Click to Reset Scale & View
-        this.canvas.addEventListener('dblclick', () => {
-            this.autoScale();
+        // Double Click to Reset Scale & View (TradingView Exact Reset)
+        this.canvas.addEventListener('dblclick', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const chartW = this.displayWidth - this.priceAxisWidth;
+            const chartH = this.displayHeight - this.timeAxisHeight;
+
+            if (mouseX >= chartW) {
+                // Double click on price scale: Reset vertical scale & offset only!
+                this.verticalScaleMultiplier = 1.0;
+                this.verticalOffset = 0.0;
+                this.requestRender();
+            } else if (mouseY >= chartH) {
+                // Double click on time scale: Reset pan offset only!
+                this.panOffset = 10.0;
+                this.requestRender();
+            } else {
+                // Double click on canvas: Full Auto-Scale
+                this.autoScale();
+            }
         });
 
         // Keyboard Shortcuts for Total Chart Control
