@@ -1015,7 +1015,7 @@ class TradingChartEngine {
             ctx.setLineDash([]);
 
             // Floating Light Green Tag Badge
-            const e2BadgeW = 166;
+            const e2BadgeW = 186;
             const e2BadgeH = 18;
             const e2BadgeX = startX + (boxWidth - e2BadgeW) / 2;
             const e2BadgeY = entry2Y - 9;
@@ -1031,7 +1031,8 @@ class TradingChartEngine {
             ctx.font = 'bold 9.5px JetBrains Mono';
             ctx.fillStyle = '#6ee7b7';
             ctx.textAlign = 'center';
-            ctx.fillText(`🟢 Deep E2 (Near SL) @ ${entry2.toFixed(entry2 > 500 ? 2 : 4)}`, e2BadgeX + (e2BadgeW / 2), e2BadgeY + 12);
+            const e2Text = isBuy ? `🟢 Deep E2 (50 Pips above SL) @ ${entry2.toFixed(entry2 > 500 ? 2 : 4)}` : `🔴 Deep E2 (50 Pips below SL) @ ${entry2.toFixed(entry2 > 500 ? 2 : 4)}`;
+            ctx.fillText(e2Text, e2BadgeX + (e2BadgeW / 2), e2BadgeY + 12);
 
             // Right Price Axis Pill for Entry 2
             ctx.fillStyle = '#059669';
