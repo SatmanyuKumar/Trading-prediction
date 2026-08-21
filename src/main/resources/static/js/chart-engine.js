@@ -92,12 +92,12 @@ class TradingChartEngine {
             const chartW = this.displayWidth - this.priceAxisWidth;
             const chartH = this.displayHeight - this.timeAxisHeight;
 
-            if (x >= (chartW - 20)) {
+            if (x >= (chartW - 25)) {
                 // Dragging Price Axis -> Smooth Vertical Height Scaling
                 this.isDraggingPriceAxis = true;
                 this.dragStartY = e.clientY;
                 this.initialVerticalScale = this.verticalScaleMultiplier;
-            } else if (y >= chartH) {
+            } else if (y >= (chartH - 10)) {
                 // Dragging Time Axis -> Smooth Horizontal Bar Width Scaling
                 this.isDraggingTimeAxis = true;
                 this.dragStartX = e.clientX;
@@ -128,16 +128,12 @@ class TradingChartEngine {
             const chartH = this.displayHeight - this.timeAxisHeight;
 
             // Cursor styling based on hover area
-            if (this.isDraggingPriceAxis) {
+            if (this.isDraggingPriceAxis || this.mouseX >= (chartW - 25)) {
                 this.canvas.style.cursor = 'ns-resize';
-            } else if (this.isDraggingTimeAxis) {
+            } else if (this.isDraggingTimeAxis || this.mouseY >= (chartH - 10)) {
                 this.canvas.style.cursor = 'ew-resize';
             } else if (this.isDragging) {
                 this.canvas.style.cursor = 'grabbing';
-            } else if (this.mouseX >= (chartW - 20)) {
-                this.canvas.style.cursor = 'ns-resize';
-            } else if (this.mouseY >= chartH) {
-                this.canvas.style.cursor = 'ew-resize';
             } else {
                 this.canvas.style.cursor = 'crosshair';
             }
@@ -156,19 +152,19 @@ class TradingChartEngine {
                 const priceDelta = (deltaY / usableH) * this.cachedPriceRange;
                 this.verticalOffset = this.initialVerticalOffset + priceDelta;
 
-                this.requestRender();
+                this.render();
             } else if (this.isDraggingPriceAxis) {
                 const deltaY = this.dragStartY - e.clientY;
                 const factor = Math.exp(deltaY / 140.0);
-                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.initialVerticalScale * factor));
-                this.requestRender();
+                this.verticalScaleMultiplier = Math.max(0.04, Math.min(35.0, this.initialVerticalScale * factor));
+                this.render();
             } else if (this.isDraggingTimeAxis) {
                 const deltaX = e.clientX - this.dragStartX;
                 const factor = Math.exp(deltaX / 180.0);
-                this.candleWidth = Math.max(2.0, Math.min(60.0, this.initialCandleWidth * factor));
+                this.candleWidth = Math.max(2.0, Math.min(65.0, this.initialCandleWidth * factor));
                 this.candleGap = Math.max(1.0, this.candleWidth * 0.4);
                 this.clampPanOffset();
-                this.requestRender();
+                this.render();
             } else {
                 this.requestRender();
             }
@@ -181,8 +177,9 @@ class TradingChartEngine {
         });
 
         // 🎯 TRADINGVIEW AUTHENTIC MOUSE ROLLER (WHEEL) & SCALE CONTROLS
-        this.canvas.addEventListener('wheel', (e) => {
+        const handleWheel = (e) => {
             e.preventDefault();
+            e.stopPropagation();
             const rect = this.canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -191,32 +188,32 @@ class TradingChartEngine {
 
             // 1. Mouse Roller on RIGHT PRICE AXIS (Side Scale Vertical Stretch/Compress)
             // Just point mouse at candle values on right side and scroll wheel -> Zooms candle height instantly!
-            if (mouseX >= (chartW - 20)) {
-                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-                this.verticalScaleMultiplier = Math.max(0.05, Math.min(25.0, this.verticalScaleMultiplier * zoomFactor));
-                this.requestRender();
+            if (mouseX >= (chartW - 25) || mouseX >= (this.displayWidth - this.priceAxisWidth - 25)) {
+                const zoomFactor = e.deltaY < 0 ? 1.18 : 0.84;
+                this.verticalScaleMultiplier = Math.max(0.04, Math.min(35.0, this.verticalScaleMultiplier * zoomFactor));
+                this.render();
                 return;
             }
 
             // 2. Mouse Roller on BOTTOM TIME AXIS (Horizontal Time Stretch/Compress)
-            if (mouseY >= chartH) {
-                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+            if (mouseY >= (chartH - 10)) {
+                const zoomFactor = e.deltaY < 0 ? 1.18 : 0.84;
                 const prevWidth = this.candleWidth;
-                const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
+                const newWidth = Math.max(2.0, Math.min(65.0, prevWidth * zoomFactor));
                 if (prevWidth !== newWidth) {
                     this.candleWidth = newWidth;
                     this.candleGap = Math.max(1.0, newWidth * 0.4);
                     this.clampPanOffset();
-                    this.requestRender();
+                    this.render();
                 }
                 return;
             }
 
             // 3. Ctrl / Meta / Alt + Mouse Roller = Bar Zoom In / Out
             if (e.ctrlKey || e.metaKey || e.altKey) {
-                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                const zoomFactor = e.deltaY < 0 ? 1.18 : 0.84;
                 const prevWidth = this.candleWidth;
-                const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
+                const newWidth = Math.max(2.0, Math.min(65.0, prevWidth * zoomFactor));
 
                 if (prevWidth !== newWidth) {
                     const stepPrev = prevWidth + this.candleGap;
@@ -229,18 +226,23 @@ class TradingChartEngine {
                     this.candleWidth = newWidth;
                     this.candleGap = Math.max(1.0, newWidth * 0.4);
                     this.clampPanOffset();
-                    this.requestRender();
+                    this.render();
                 }
                 return;
             }
 
             // 4. Direct Mouse Roller (Bina Shift Dabay) -> Smooth Sideways Horizontal Scroll / Pan
             const scrollDelta = (Math.abs(e.deltaX) > Math.abs(e.deltaY)) ? e.deltaX : e.deltaY;
-            const panStep = scrollDelta > 0 ? -3.2 : 3.2;
+            const panStep = scrollDelta > 0 ? -3.5 : 3.5;
             this.panOffset += panStep;
             this.clampPanOffset();
-            this.requestRender();
-        }, { passive: false });
+            this.render();
+        };
+
+        this.canvas.addEventListener('wheel', handleWheel, { passive: false });
+        if (this.canvas.parentElement) {
+            this.canvas.parentElement.addEventListener('wheel', handleWheel, { passive: false });
+        }
 
         // Double Click to Reset Scale & View (TradingView Exact Reset)
         this.canvas.addEventListener('dblclick', (e) => {
