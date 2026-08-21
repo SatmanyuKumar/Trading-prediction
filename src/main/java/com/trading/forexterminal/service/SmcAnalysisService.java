@@ -8,6 +8,13 @@ import java.util.*;
 @Service
 public class SmcAnalysisService {
 
+    // Persistent active setups map across all timeframes & modes: Key = "SYMBOL_TIMEFRAME_MODE"
+    private final Map<String, TradeSetup> activeLockedSetups = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void clearActiveSetups() {
+        activeLockedSetups.clear();
+    }
+
     /**
      * Institutional Smart Money Analysis Engine
      * Supports Dual Trading Modes: SCALP (Fast 1:2.2 R:R) vs SWING (Macro 1:4.5+ R:R)
@@ -39,8 +46,64 @@ public class SmcAnalysisService {
         List<OrderBlock> orderBlocks = detectOrderBlocks(candles, isSwing);
         List<SupportResistance> srLevels = detectSupportResistance(candles, isSwing, symbol);
 
-        // 3. Multi-Factor Institutional Confluence & Strategy Generation (Scalp vs Swing)
-        TradeSetup setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
+        // 3. Multi-Factor Institutional Confluence & Strategy Generation (Stateful & Locked until SL / TP hit)
+        String setupKey = (symbol != null ? symbol.toUpperCase() : "XAUUSD") + "_" + 
+                          (timeframe != null ? timeframe.toLowerCase() : "15m") + "_" + 
+                          mode.toUpperCase();
+
+        TradeSetup setup;
+        TradeSetup active = activeLockedSetups.get(setupKey);
+
+        if (active != null) {
+            boolean isBuy = "BUY".equalsIgnoreCase(active.getSignal());
+            double sl = active.getStopLoss();
+            double tp = active.getTakeProfit1();
+            boolean slHit = false;
+            boolean tpHit = false;
+
+            // Check across recent candles if SL or TP was reached
+            int checkStart = Math.max(0, candles.size() - 25);
+            for (int i = checkStart; i < candles.size(); i++) {
+                Candle c = candles.get(i);
+                if (c.getTimestamp() >= active.getTimestamp() - 2000) {
+                    if (isBuy) {
+                        if (c.getLow() <= sl) slHit = true;
+                        if (c.getHigh() >= tp) tpHit = true;
+                    } else {
+                        if (c.getHigh() >= sl) slHit = true;
+                        if (c.getLow() <= tp) tpHit = true;
+                    }
+                }
+            }
+
+            // Also check latest live currentPrice
+            if (isBuy) {
+                if (currentPrice <= sl) slHit = true;
+                if (currentPrice >= tp) tpHit = true;
+            } else {
+                if (currentPrice >= sl) slHit = true;
+                if (currentPrice <= tp) tpHit = true;
+            }
+
+            if (slHit || tpHit) {
+                // Setup is resolved (SL or TP hit) -> Retire and allow next structural setup to appear!
+                activeLockedSetups.remove(setupKey);
+                setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
+                if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
+                    activeLockedSetups.put(setupKey, setup);
+                }
+            } else {
+                // Setup is ACTIVE -> Lock exact coordinates (Zero repainting / wandering of Entry or SL!)
+                active.setCurrentPrice(currentPrice);
+                setup = active;
+            }
+        } else {
+            // No locked setup -> Generate and lock initial setup
+            setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
+            if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
+                activeLockedSetups.put(setupKey, setup);
+            }
+        }
 
         // 4. Populate Result
         AnalysisResult result = new AnalysisResult();

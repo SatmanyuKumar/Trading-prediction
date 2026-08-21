@@ -586,6 +586,7 @@ public class MarketDataService {
     }
 
     public int clearSuggestionHistory() {
+        smcAnalysisService.clearActiveSetups();
         return suggestionHistoryService.clearSuggestionHistory();
     }
 
