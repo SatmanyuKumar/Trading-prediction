@@ -94,19 +94,19 @@ public class MarketController {
 
     @GetMapping("/analysis")
     public ResponseEntity<AnalysisResult> getAnalysis(
-            @RequestParam(defaultValue = "XAUUSD") String symbol,
-            @RequestParam(defaultValue = "1m") String timeframe,
-            @RequestParam(defaultValue = "SCALP") String tradeMode) {
+            @RequestParam(name = "symbol", defaultValue = "XAUUSD") String symbol,
+            @RequestParam(name = "timeframe", defaultValue = "1m") String timeframe,
+            @RequestParam(name = "tradeMode", defaultValue = "SCALP") String tradeMode) {
         AnalysisResult analysis = marketDataService.getAnalysis(symbol, timeframe, tradeMode);
         return ResponseEntity.ok(analysis);
     }
 
     @GetMapping("/advisor")
     public ResponseEntity<TradeAdvisorResult> getTradeAdvisor(
-            @RequestParam(defaultValue = "XAUUSD") String symbol,
-            @RequestParam(defaultValue = "1m") String timeframe,
-            @RequestParam(defaultValue = "SCALP") String tradeMode,
-            @RequestParam(defaultValue = "0.10") double lotSize) {
+            @RequestParam(name = "symbol", defaultValue = "XAUUSD") String symbol,
+            @RequestParam(name = "timeframe", defaultValue = "1m") String timeframe,
+            @RequestParam(name = "tradeMode", defaultValue = "SCALP") String tradeMode,
+            @RequestParam(name = "lotSize", defaultValue = "0.10") double lotSize) {
         TradeAdvisorResult advisor = marketDataService.getTradeAdvisor(symbol, timeframe, tradeMode, lotSize);
         return ResponseEntity.ok(advisor);
     }
@@ -175,14 +175,14 @@ public class MarketController {
     }
 
     @PostMapping("/orders/{id}/close")
-    public ResponseEntity<Map<String, Object>> closeOrder(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> closeOrder(@PathVariable(name = "id") String id) {
         vantageBridgeService.queueCloseOrder(id);
         marketDataService.closeOrder(id);
         return ResponseEntity.ok(Map.of("status", "CLOSE_QUEUED", "id", id));
     }
 
     @DeleteMapping("/orders/{id}")
-    public ResponseEntity<Map<String, Object>> deleteOrder(@PathVariable String id) {
+    public ResponseEntity<Map<String, Object>> deleteOrder(@PathVariable(name = "id") String id) {
         boolean deleted = marketDataService.deleteOrder(id);
         return ResponseEntity.ok(Map.of("deleted", deleted, "id", id));
     }

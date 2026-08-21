@@ -920,9 +920,10 @@ class TradingChartEngine {
         ctx.stroke();
 
         // 5. Fixed Center Setup Badge
-        const badgeW = 176;
+        const isSniper = setup.setupTitle && setup.setupTitle.includes('Sniper');
+        const badgeW = isSniper ? 186 : 176;
         const badgeH = 22;
-        const badgeX = startX + 7;
+        const badgeX = startX + (boxWidth - badgeW) / 2;
         const badgeY = entryY - 11;
 
         ctx.fillStyle = isBuy ? 'rgba(5, 150, 105, 0.96)' : 'rgba(220, 38, 38, 0.96)';
@@ -936,9 +937,8 @@ class TradingChartEngine {
 
         ctx.font = 'bold 10px JetBrains Mono';
         ctx.fillStyle = '#ffffff';
-        const isSniper = setup.setupTitle && setup.setupTitle.includes('Sniper');
         const setupIcon = isBuy ? '🚀 BUY' : '🔻 SELL';
-        const entryTag = isSniper ? '80% OTE' : '50% FVG';
+        const entryTag = isSniper ? '🎯 75% OTE' : '50% FVG';
         ctx.fillText(`${setupIcon} ${entryTag} @ ${setup.entryPrice.toFixed(setup.entryPrice > 500 ? 2 : 4)}`, badgeX + (badgeW / 2), badgeY + 15);
 
         // TP Label Inside Fixed Green Box

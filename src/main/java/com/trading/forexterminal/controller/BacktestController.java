@@ -16,12 +16,12 @@ public class BacktestController {
 
     @GetMapping
     public ResponseEntity<BacktestResult> runBacktest(
-            @RequestParam(defaultValue = "XAUUSD") String symbol,
-            @RequestParam(defaultValue = "15m") String timeframe,
-            @RequestParam(defaultValue = "SCALP") String tradeMode,
-            @RequestParam(defaultValue = "300") int candles,
-            @RequestParam(defaultValue = "30.0") double initialCapital,
-            @RequestParam(defaultValue = "0.01") double lotSize) {
+            @RequestParam(name = "symbol", defaultValue = "XAUUSD") String symbol,
+            @RequestParam(name = "timeframe", defaultValue = "15m") String timeframe,
+            @RequestParam(name = "tradeMode", defaultValue = "SCALP") String tradeMode,
+            @RequestParam(name = "candles", defaultValue = "300") int candles,
+            @RequestParam(name = "initialCapital", defaultValue = "30.0") double initialCapital,
+            @RequestParam(name = "lotSize", defaultValue = "0.01") double lotSize) {
         BacktestResult result = backtestService.runBacktest(symbol, timeframe, tradeMode, candles, initialCapital, lotSize);
         return ResponseEntity.ok(result);
     }
