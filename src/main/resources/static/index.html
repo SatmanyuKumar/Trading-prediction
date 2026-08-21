@@ -312,7 +312,14 @@
                     <div class="confidence-pill" id="signal-confidence">88% CONFIDENCE</div>
                 </div>
 
-                <h3 class="setup-name" id="setup-title">Institutional Bullish OTE + Untouched FVG Demand</h3>
+                <div class="signal-time-row" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; margin-bottom: 4px; gap: 8px; flex-wrap: wrap;">
+                    <h3 class="setup-name" id="setup-title" style="margin: 0; flex: 1; min-width: 160px;">Institutional Bullish OTE + Untouched FVG Demand</h3>
+                    <div class="time-indicator-pill" id="signal-time-badge" style="font-size: 11px; color: #38bdf8; font-weight: 600; padding: 3px 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 5px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                        <span>🕒 Entered Box:</span>
+                        <span id="val-setup-time" style="color: #ffffff; font-family: 'JetBrains Mono', monospace; font-weight: 700;">--:--:--</span>
+                        <span id="val-setup-elapsed" style="color: #94a3b8; font-size: 10px; font-weight: 400;">(--)</span>
+                    </div>
+                </div>
 
                 <!-- Trade Coordinates Grid -->
                 <div class="trade-matrix">
@@ -868,7 +875,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart-engine.js?v=5.5"></script>
-    <script src="js/app.js?v=5.5"></script>
+    <script src="js/chart-engine.js?v=5.9"></script>
+    <script src="js/app.js?v=5.9"></script>
 </body>
 </html>

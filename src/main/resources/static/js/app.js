@@ -787,6 +787,23 @@ document.addEventListener('DOMContentLoaded', () => {
             if (valRr) valRr.textContent = '1 : ' + setup.riskRewardRatio;
         }
 
+        // Live Trade Entered Box Time formatting
+        const signalTimeBadge = document.getElementById('signal-time-badge');
+        const valSetupTime = document.getElementById('val-setup-time');
+        const valSetupElapsed = document.getElementById('val-setup-elapsed');
+
+        if (setup && setup.timestamp && !isHold) {
+            state.activeSetupTimestamp = setup.timestamp;
+            const t = new Date(setup.timestamp);
+            const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            if (valSetupTime) valSetupTime.textContent = timeStr;
+            updateSetupElapsedTime();
+            if (signalTimeBadge) signalTimeBadge.style.display = 'inline-flex';
+        } else {
+            state.activeSetupTimestamp = null;
+            if (signalTimeBadge) signalTimeBadge.style.display = 'none';
+        }
+
         const bullFvg = (data.fairValueGaps || []).find(f => f.type === 'BULLISH' && !f.mitigated);
         const bearFvg = (data.fairValueGaps || []).find(f => f.type === 'BEARISH' && !f.mitigated);
 
@@ -2024,10 +2041,29 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchSuggestions();
     }, 800);
 
+    function updateSetupElapsedTime() {
+        if (!state.activeSetupTimestamp) return;
+        const valSetupElapsed = document.getElementById('val-setup-elapsed');
+        if (!valSetupElapsed) return;
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - state.activeSetupTimestamp) / 1000));
+        let elapsedStr = '';
+        if (elapsedSec < 60) {
+            elapsedStr = `(${elapsedSec}s ago)`;
+        } else if (elapsedSec < 3600) {
+            elapsedStr = `(${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s ago)`;
+        } else {
+            elapsedStr = `(${Math.floor(elapsedSec / 3600)}h ${Math.floor((elapsedSec % 3600) / 60)}m ago)`;
+        }
+        valSetupElapsed.textContent = elapsedStr;
+    }
+
     setInterval(() => {
         loadAnalysis();
         fetchRadarData();
         fetchSuggestions();
         fetchOrders();
     }, 4000);
+
+    // Dynamic 1-second timer to keep trade box elapsed time ticking live
+    setInterval(updateSetupElapsedTime, 1000);
 });

@@ -1103,6 +1103,16 @@ class TradingChartEngine {
         const entryTag = isSniper ? '🎯 75% OTE' : '50% FVG';
         ctx.fillText(`${setupIcon} ${entryTag} @ ${setup.entryPrice.toFixed(setup.entryPrice > 500 ? 2 : 4)}`, badgeX + (badgeW / 2), badgeY + 15);
 
+        // Entry Box Timestamp
+        if (setup.timestamp) {
+            const st = new Date(setup.timestamp);
+            const timeStr = st.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            ctx.font = 'bold 8.5px JetBrains Mono';
+            ctx.fillStyle = '#94a3b8';
+            ctx.textAlign = 'left';
+            ctx.fillText(`🕒 ${timeStr}`, startX + 6, isBuy ? slBoxTop + 14 : tpBoxTop + 14);
+        }
+
         // 5.5. Dual Entry 2 (Deep Near-SL Entry) -> Subtle Thin Light Green Dashed Line
         const entry2 = setup.entryPrice2;
         if (entry2 && Math.abs(entry2 - setup.entryPrice) > 0.0001) {
