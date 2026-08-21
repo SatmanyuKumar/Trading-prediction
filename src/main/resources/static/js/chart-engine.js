@@ -368,6 +368,7 @@ class TradingChartEngine {
         this.ema50 = analysisData.ema50 || [];
         this.ema200 = analysisData.ema200 || [];
         this.tradeSetup = analysisData.tradeSetup || null;
+        this.historicalSetups = analysisData.historicalSetups || [];
 
         if (analysisData.currentPrice) {
             this.targetLivePrice = analysisData.currentPrice;
@@ -388,24 +389,25 @@ class TradingChartEngine {
     }
 
     zoomIn() {
-        this.candleWidth = Math.min(45.0, this.candleWidth * 1.25);
-        this.candleGap = Math.max(1.0, this.candleWidth * 0.4);
-        this.clampPanOffset();
-        this.requestRender();
+        const prevWidth = this.candleWidth;
+        const newWidth = Math.min(65.0, prevWidth * 1.25);
+        if (prevWidth !== newWidth) {
+            this.candleWidth = newWidth;
+            this.candleGap = Math.max(1.0, newWidth * 0.4);
+            this.clampPanOffset();
+            this.requestRender();
+        }
     }
 
     zoomOut() {
-        this.candleWidth = Math.max(2.5, this.candleWidth * 0.8);
-        this.candleGap = Math.max(1.0, this.candleWidth * 0.4);
-        this.clampPanOffset();
-        this.requestRender();
-    }
-
-    autoScale() {
-        this.verticalScaleMultiplier = 1.0;
-        this.verticalOffset = 0.0;
-        this.panOffset = 10.0; // Reset to 10 empty bars breathing room for future setup
-        this.requestRender();
+        const prevWidth = this.candleWidth;
+        const newWidth = Math.max(2.0, prevWidth * 0.80);
+        if (prevWidth !== newWidth) {
+            this.candleWidth = newWidth;
+            this.candleGap = Math.max(1.0, newWidth * 0.4);
+            this.clampPanOffset();
+            this.requestRender();
+        }
     }
 
     resetZoom() {
@@ -524,9 +526,14 @@ class TradingChartEngine {
             this.drawMarketStructures(ctx, startIndex, endIndex, indexToX, priceToY);
         }
 
-        // 8. Trade Setup (SL & TP Targets) (if checked)
-        if (this.flags.setup && this.tradeSetup) {
-            this.drawTradeSetupOverlay(ctx, chartW, priceToY, indexToX);
+        // 8. Trade Setups (Option 2: Left Historical Muted Boxes + Right Live Active Glowing Box)
+        if (this.flags.setup) {
+            if (this.historicalSetups && this.historicalSetups.length > 0) {
+                this.drawHistoricalSetups(ctx, chartW, priceToY, indexToX);
+            }
+            if (this.tradeSetup) {
+                this.drawTradeSetupOverlay(ctx, chartW, priceToY, indexToX);
+            }
         }
 
         // 9. Scales & Axis Labels
@@ -878,6 +885,103 @@ class TradingChartEngine {
             }
         }
         ctx.stroke();
+    }
+
+    drawHistoricalSetups(ctx, chartW, priceToY, indexToX) {
+        if (!this.historicalSetups || this.historicalSetups.length === 0 || !indexToX || !priceToY) return;
+
+        const totalCandles = this.candles.length;
+        if (totalCandles === 0) return;
+
+        const lastCandleIdx = totalCandles - 1;
+
+        this.historicalSetups.forEach((setup, sIdx) => {
+            if (!setup || !setup.entryPrice || !setup.stopLoss) return;
+
+            const isBuy = setup.signal === 'BUY';
+            const entryY = priceToY(setup.entryPrice);
+            const slY = priceToY(setup.stopLoss);
+            const tpY = priceToY(setup.takeProfit1 || (isBuy ? setup.entryPrice + (setup.entryPrice - setup.stopLoss) * 2 : setup.entryPrice - (setup.stopLoss - setup.entryPrice) * 2));
+
+            // Determine historical X placement anchored to past candles (Left side of active trade)
+            const offsetFromRunning = 210 + ((this.historicalSetups.length - sIdx) * 190);
+            const runningX = indexToX(lastCandleIdx);
+            const boxW = 160;
+            const startX = Math.max(10, Math.min(chartW - 200, runningX - offsetFromRunning));
+            const endX = startX + boxW;
+
+            if (endX < 0 || startX > chartW) return; // Clipping
+
+            // 1. Muted Take Profit Box (10% opacity)
+            const tpBoxTop = Math.min(entryY, tpY);
+            const tpBoxH = Math.max(4, Math.abs(entryY - tpY));
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+            ctx.fillRect(startX, tpBoxTop, boxW, tpBoxH);
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+            ctx.setLineDash([2, 2]);
+            ctx.lineWidth = 1.0;
+            ctx.strokeRect(startX, tpBoxTop, boxW, tpBoxH);
+
+            // 2. Muted Stop Loss Box (10% opacity)
+            const slBoxTop = Math.min(entryY, slY);
+            const slBoxH = Math.max(4, Math.abs(entryY - slY));
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+            ctx.fillRect(startX, slBoxTop, boxW, slBoxH);
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
+            ctx.strokeRect(startX, slBoxTop, boxW, slBoxH);
+            ctx.setLineDash([]);
+
+            // 3. Muted Entry Line
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(startX, entryY);
+            ctx.lineTo(endX, entryY);
+            ctx.stroke();
+
+            // 4. Center Historical Status Badge (❌ FAILED / 🛑 SL HIT / 🎯 TP HIT)
+            const badgeW = 156;
+            const badgeH = 20;
+            const badgeX = startX + (boxW - badgeW) / 2;
+            const badgeY = entryY - 10;
+
+            const isTrendShift = setup.status === 'FAILED_TREND_SHIFT';
+            const isSlHit = setup.status === 'FAILED_SL';
+            const isTpHit = setup.status === 'TP_HIT';
+
+            if (isTrendShift) {
+                ctx.fillStyle = 'rgba(51, 65, 85, 0.92)'; // Slate Muted
+                ctx.strokeStyle = '#94a3b8';
+            } else if (isSlHit) {
+                ctx.fillStyle = 'rgba(127, 29, 29, 0.92)'; // Crimson Muted
+                ctx.strokeStyle = '#f87171';
+            } else {
+                ctx.fillStyle = 'rgba(6, 78, 59, 0.92)'; // Emerald Muted
+                ctx.strokeStyle = '#34d399';
+            }
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4) : ctx.rect(badgeX, badgeY, badgeW, badgeH);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.font = 'bold 9px JetBrains Mono';
+            ctx.textAlign = 'center';
+
+            if (isTrendShift) {
+                ctx.fillStyle = '#e2e8f0';
+                ctx.fillText(`❌ FAILED (TREND SHIFT)`, badgeX + (badgeW / 2), badgeY + 13);
+            } else if (isSlHit) {
+                ctx.fillStyle = '#fca5a5';
+                ctx.fillText(`🛑 FAILED (SL HIT)`, badgeX + (badgeW / 2), badgeY + 13);
+            } else if (isTpHit) {
+                ctx.fillStyle = '#6ee7b7';
+                ctx.fillText(`🎯 TARGET HIT (+PROFIT)`, badgeX + (badgeW / 2), badgeY + 13);
+            } else {
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillText(`❌ INVALIDATED PAST SETUP`, badgeX + (badgeW / 2), badgeY + 13);
+            }
+        });
     }
 
     drawTradeSetupOverlay(ctx, chartW, priceToY, indexToX) {

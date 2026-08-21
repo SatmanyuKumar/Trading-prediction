@@ -19,6 +19,7 @@ public class AnalysisResult {
     private List<Double> ema50;
     private List<Double> ema200;
     private TradeSetup tradeSetup;
+    private List<TradeSetup> historicalSetups;
 
     public AnalysisResult() {}
 
@@ -70,4 +71,7 @@ public class AnalysisResult {
 
     public TradeSetup getTradeSetup() { return tradeSetup; }
     public void setTradeSetup(TradeSetup tradeSetup) { this.tradeSetup = tradeSetup; }
+
+    public List<TradeSetup> getHistoricalSetups() { return historicalSetups; }
+    public void setHistoricalSetups(List<TradeSetup> historicalSetups) { this.historicalSetups = historicalSetups; }
 }

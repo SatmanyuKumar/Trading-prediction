@@ -19,6 +19,9 @@ public class TradeSetup {
     private List<String> confluencePoints;
     private String bookRulesExplanation;
     private long timestamp;
+    private String status = "ACTIVE"; // "ACTIVE", "FAILED_SL", "FAILED_TREND_SHIFT", "TP_HIT"
+    private long startTimestamp;
+    private long endTimestamp;
 
     public TradeSetup() {}
 
@@ -98,4 +101,13 @@ public class TradeSetup {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public long getStartTimestamp() { return startTimestamp; }
+    public void setStartTimestamp(long startTimestamp) { this.startTimestamp = startTimestamp; }
+
+    public long getEndTimestamp() { return endTimestamp; }
+    public void setEndTimestamp(long endTimestamp) { this.endTimestamp = endTimestamp; }
 }

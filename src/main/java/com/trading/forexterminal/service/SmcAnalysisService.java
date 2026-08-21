@@ -10,9 +10,11 @@ public class SmcAnalysisService {
 
     // Persistent active setups map across all timeframes & modes: Key = "SYMBOL_TIMEFRAME_MODE"
     private final Map<String, TradeSetup> activeLockedSetups = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, List<TradeSetup>> historicalSetupsMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     public void clearActiveSetups() {
         activeLockedSetups.clear();
+        historicalSetupsMap.clear();
     }
 
     /**
@@ -60,6 +62,7 @@ public class SmcAnalysisService {
             double tp = active.getTakeProfit1();
             boolean slHit = false;
             boolean tpHit = false;
+            boolean trendShift = false;
 
             // Check across recent candles if SL or TP was reached
             int checkStart = Math.max(0, candles.size() - 25);
@@ -85,22 +88,47 @@ public class SmcAnalysisService {
                 if (currentPrice <= tp) tpHit = true;
             }
 
-            if (slHit || tpHit) {
-                // Setup is resolved (SL or TP hit) -> Retire and allow next structural setup to appear!
+            // Check if market has firmly shifted trend against active trade
+            double e20Val = ema20.get(ema20.size() - 1);
+            double e50Val = ema50.get(ema50.size() - 1);
+            double e200Val = ema200.get(ema200.size() - 1);
+            if (isBuy && (e20Val < e50Val && e50Val < e200Val && currentPrice < active.getEntryPrice() - (Math.abs(active.getEntryPrice() - sl) * 0.35))) {
+                trendShift = true;
+            } else if (!isBuy && (e20Val > e50Val && e50Val > e200Val && currentPrice > active.getEntryPrice() + (Math.abs(sl - active.getEntryPrice()) * 0.35))) {
+                trendShift = true;
+            }
+
+            if (slHit || tpHit || trendShift) {
+                // Setup is resolved -> Archive and allow next structural setup to appear!
+                String resolutionStatus = tpHit ? "TP_HIT" : (trendShift ? "FAILED_TREND_SHIFT" : "FAILED_SL");
+                active.setStatus(resolutionStatus);
+                active.setEndTimestamp(System.currentTimeMillis());
+
+                List<TradeSetup> history = historicalSetupsMap.computeIfAbsent(setupKey, k -> new java.util.concurrent.CopyOnWriteArrayList<>());
+                if (history.stream().noneMatch(h -> h.getId().equals(active.getId()))) {
+                    history.add(active);
+                    if (history.size() > 4) history.remove(0);
+                }
                 activeLockedSetups.remove(setupKey);
+
                 setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
                 if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
+                    setup.setStartTimestamp(System.currentTimeMillis());
+                    setup.setStatus("ACTIVE");
                     activeLockedSetups.put(setupKey, setup);
                 }
             } else {
-                // Setup is ACTIVE -> Lock exact coordinates (Zero repainting / wandering of Entry or SL!)
+                // Setup is ACTIVE -> Lock exact coordinates
                 active.setCurrentPrice(currentPrice);
+                active.setStatus("ACTIVE");
                 setup = active;
             }
         } else {
             // No locked setup -> Generate and lock initial setup
             setup = generateInstitutionalSetup(symbol, timeframe, mode, candles, fvgs, orderBlocks, srLevels, ema20, ema50, ema200, atr14, spread);
             if (setup != null && ("BUY".equals(setup.getSignal()) || "SELL".equals(setup.getSignal())) && setup.getConfidence() >= 70) {
+                setup.setStartTimestamp(System.currentTimeMillis());
+                setup.setStatus("ACTIVE");
                 activeLockedSetups.put(setupKey, setup);
             }
         }
@@ -121,6 +149,7 @@ public class SmcAnalysisService {
         result.setEma50(ema50);
         result.setEma200(ema200);
         result.setTradeSetup(setup);
+        result.setHistoricalSetups(historicalSetupsMap.getOrDefault(setupKey, List.of()));
 
         return result;
     }
