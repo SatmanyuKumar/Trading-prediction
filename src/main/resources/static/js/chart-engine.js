@@ -211,40 +211,34 @@ class TradingChartEngine {
                 return;
             }
 
-            // 3. Mouse Roller with Modifier Keys (Shift = Horizontal Pan, Ctrl = Vertical Scale)
-            if (e.shiftKey) {
-                const panStep = (e.deltaY || e.deltaX) > 0 ? -3.0 : 3.0;
-                this.panOffset += panStep;
-                this.clampPanOffset();
-                this.requestRender();
-                return;
-            }
-
-            if (e.ctrlKey || e.metaKey) {
+            // 3. Ctrl / Meta / Alt + Mouse Roller = Bar Zoom In / Out
+            if (e.ctrlKey || e.metaKey || e.altKey) {
                 const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-                this.verticalScaleMultiplier = Math.max(0.10, Math.min(15.0, this.verticalScaleMultiplier * zoomFactor));
-                this.requestRender();
+                const prevWidth = this.candleWidth;
+                const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
+
+                if (prevWidth !== newWidth) {
+                    const stepPrev = prevWidth + this.candleGap;
+                    const stepNew = newWidth + Math.max(1.0, newWidth * 0.4);
+
+                    const candlesFromRight = (chartW - mouseX) / stepPrev;
+                    const newCandlesFromRight = (chartW - mouseX) / stepNew;
+
+                    this.panOffset += (candlesFromRight - newCandlesFromRight);
+                    this.candleWidth = newWidth;
+                    this.candleGap = Math.max(1.0, newWidth * 0.4);
+                    this.clampPanOffset();
+                    this.requestRender();
+                }
                 return;
             }
 
-            // 4. Default TradingView Cursor-Anchored Canvas Zoom
-            const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-            const prevWidth = this.candleWidth;
-            const newWidth = Math.max(2.0, Math.min(60.0, prevWidth * zoomFactor));
-
-            if (prevWidth !== newWidth) {
-                const stepPrev = prevWidth + this.candleGap;
-                const stepNew = newWidth + Math.max(1.0, newWidth * 0.4);
-
-                const candlesFromRight = (chartW - mouseX) / stepPrev;
-                const newCandlesFromRight = (chartW - mouseX) / stepNew;
-
-                this.panOffset += (candlesFromRight - newCandlesFromRight);
-                this.candleWidth = newWidth;
-                this.candleGap = Math.max(1.0, newWidth * 0.4);
-                this.clampPanOffset();
-                this.requestRender();
-            }
+            // 4. Direct Mouse Roller (Bina Shift Dabay) -> Smooth Sideways Horizontal Scroll / Pan
+            const scrollDelta = (Math.abs(e.deltaX) > Math.abs(e.deltaY)) ? e.deltaX : e.deltaY;
+            const panStep = scrollDelta > 0 ? -3.2 : 3.2;
+            this.panOffset += panStep;
+            this.clampPanOffset();
+            this.requestRender();
         }, { passive: false });
 
         // Double Click to Reset Scale & View (TradingView Exact Reset)
