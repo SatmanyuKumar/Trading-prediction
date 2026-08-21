@@ -704,11 +704,11 @@ public class SmcAnalysisService {
             }
             stopLoss = round(entry + risk, 5);
 
-            // 3. Dual Entry 2 (Strictly 5 points / 50 pips Near-SL Entry)
-            double slOffset50Pips = get50PipDistance(symbol);
-            entry2 = round(stopLoss - slOffset50Pips, 5);
-            if (entry2 <= entry) {
-                entry2 = round(stopLoss - Math.min(slOffset50Pips, risk * 0.20), 5);
+            // 3. Dual Entry 2 (Structural Invalidation Inflection Level: 50%+ Bounce Probability Floor)
+            // Sits at the Structural High Ceiling (75-80% OTE Premium Retest). Above this, bounce chance drops drastically.
+            entry2 = round(anchorWickHigh - spread, 5);
+            if (entry2 <= entry || entry2 >= stopLoss) {
+                entry2 = round(entry + (risk * 0.60), 5); // 60% Deep Retest Level
             }
 
             // 4. Take Profit Targets (Preserve Full Macro Target / Range Low / Demand)
@@ -726,7 +726,7 @@ public class SmcAnalysisService {
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Trend Continuation (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
             confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural High @" + formatPrice(anchorWickHigh, symbol) + " + Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
-            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | Deep Entry 2 (50 Pips from SL): " + formatPrice(entry2, symbol));
+            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
             confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Short)");
@@ -741,7 +741,7 @@ public class SmcAnalysisService {
                 "   Market structure on %s is in **Bearish Trend Alignment** seeking downside Discount Liquidity.\n\n" +
                 "2. **Dual Supply Entry Coordination:**\n" +
                 "   • Primary Entry 1: **%s** (50%% FVG / OTE Equilibrium)\n" +
-                "   • Deep Entry 2 (50 Pips near SL): **%s** (High R:R Discount Limit)\n\n" +
+                "   • High-Prob Inflection E2: **%s** (Supply Ceiling Retest with 50%%+ Reversal Odds)\n\n" +
                 "3. **Wick Anchor & Buffer Invalidation:**\n" +
                 "   SL is placed safely at **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
@@ -819,11 +819,11 @@ public class SmcAnalysisService {
             }
             stopLoss = round(entry - risk, 5);
 
-            // 3. Dual Entry 2 (Strictly 5 points / 50 pips Near-SL Entry)
-            double slOffset50Pips = get50PipDistance(symbol);
-            entry2 = round(stopLoss + slOffset50Pips, 5);
-            if (entry2 >= entry) {
-                entry2 = round(stopLoss + Math.min(slOffset50Pips, risk * 0.20), 5);
+            // 3. Dual Entry 2 (Structural Invalidation Inflection Level: 50%+ Bounce Probability Floor)
+            // Sits at the Structural Low Base (75-80% OTE Demand Retest). Below this, bounce chance drops drastically.
+            entry2 = round(anchorWickLow + spread, 5);
+            if (entry2 >= entry || entry2 <= stopLoss) {
+                entry2 = round(entry - (risk * 0.60), 5); // 60% Deep Retest Level
             }
 
             // 4. Take Profit Targets (1:5.5+ Asymmetric Expansion)
@@ -841,7 +841,7 @@ public class SmcAnalysisService {
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Bullish Expansion (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
             confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural Low @" + formatPrice(anchorWickLow, symbol) + " - Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
-            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | Deep Entry 2 (Near SL): " + formatPrice(entry2, symbol));
+            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
             confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Expectancy)");
@@ -856,7 +856,7 @@ public class SmcAnalysisService {
                 "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply at %s**.\n\n" +
                 "2. **Dual Demand Entry Coordination:**\n" +
                 "   • Primary Entry 1: **%s** (50%% FVG / OTE Equilibrium)\n" +
-                "   • Deep Entry 2 (Near SL): **%s** (High R:R Discount Limit)\n\n" +
+                "   • High-Prob Inflection E2: **%s** (Demand Floor Retest with 50%%+ Reversal Odds)\n\n" +
                 "3. **Wick Anchor & Buffer Invalidation:**\n" +
                 "   SL is placed safely below **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
