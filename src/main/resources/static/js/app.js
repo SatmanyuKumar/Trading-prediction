@@ -766,13 +766,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (valRr) valRr.textContent = '--';
         } else {
             if (valEntry) valEntry.textContent = formatPrice(setup.entryPrice, setup.symbol);
+            const valEntry2Sub = document.getElementById('val-entry2-sub');
+            if (valEntry2Sub) {
+                if (setup.entryPrice2 && Math.abs(setup.entryPrice2 - setup.entryPrice) > 0.0001) {
+                    valEntry2Sub.textContent = `🟢 E2 (Near SL): ${formatPrice(setup.entryPrice2, setup.symbol)}`;
+                } else {
+                    valEntry2Sub.textContent = 'Primary Limit Order';
+                }
+            }
             if (valSl) valSl.textContent = formatPrice(setup.stopLoss, setup.symbol);
             if (valSlSub) {
                 const anchorPt = (setup.confluencePoints || []).find(p => p && p.includes('Invalidation Anchor'));
                 if (anchorPt) {
                     valSlSub.textContent = anchorPt.replace('🛡️ Invalidation Anchor: ', '');
                 } else {
-                    valSlSub.textContent = 'Wick Floor ± 1.3x ATR';
+                    valSlSub.textContent = 'Wick Floor ± Safe Buffer';
                 }
             }
             if (valTp1) valTp1.textContent = formatPrice(setup.takeProfit1, setup.symbol);

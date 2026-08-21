@@ -10,6 +10,7 @@ public class TradeSetup {
     private int confidence; // 0 - 100%
     private double currentPrice;
     private double entryPrice;
+    private double entryPrice2; // Deep Limit Entry near SL (Minimal Risk)
     private double stopLoss;
     private double takeProfit1;
     private double takeProfit2;
@@ -22,7 +23,7 @@ public class TradeSetup {
     public TradeSetup() {}
 
     public TradeSetup(String id, String symbol, String timeframe, String signal, int confidence, double currentPrice,
-                      double entryPrice, double stopLoss, double takeProfit1, double takeProfit2,
+                      double entryPrice, double entryPrice2, double stopLoss, double takeProfit1, double takeProfit2,
                       double riskRewardRatio, String setupType, List<String> confluencePoints,
                       String bookRulesExplanation, long timestamp) {
         this.id = id;
@@ -32,6 +33,7 @@ public class TradeSetup {
         this.confidence = confidence;
         this.currentPrice = currentPrice;
         this.entryPrice = entryPrice;
+        this.entryPrice2 = entryPrice2;
         this.stopLoss = stopLoss;
         this.takeProfit1 = takeProfit1;
         this.takeProfit2 = takeProfit2;
@@ -40,6 +42,13 @@ public class TradeSetup {
         this.confluencePoints = confluencePoints;
         this.bookRulesExplanation = bookRulesExplanation;
         this.timestamp = timestamp;
+    }
+
+    public TradeSetup(String id, String symbol, String timeframe, String signal, int confidence, double currentPrice,
+                      double entryPrice, double stopLoss, double takeProfit1, double takeProfit2,
+                      double riskRewardRatio, String setupType, List<String> confluencePoints,
+                      String bookRulesExplanation, long timestamp) {
+        this(id, symbol, timeframe, signal, confidence, currentPrice, entryPrice, entryPrice, stopLoss, takeProfit1, takeProfit2, riskRewardRatio, setupType, confluencePoints, bookRulesExplanation, timestamp);
     }
 
     public String getId() { return id; }
@@ -62,6 +71,9 @@ public class TradeSetup {
 
     public double getEntryPrice() { return entryPrice; }
     public void setEntryPrice(double entryPrice) { this.entryPrice = entryPrice; }
+
+    public double getEntryPrice2() { return entryPrice2; }
+    public void setEntryPrice2(double entryPrice2) { this.entryPrice2 = entryPrice2; }
 
     public double getStopLoss() { return stopLoss; }
     public void setStopLoss(double stopLoss) { this.stopLoss = stopLoss; }

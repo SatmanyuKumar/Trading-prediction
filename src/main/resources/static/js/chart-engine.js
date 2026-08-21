@@ -999,6 +999,49 @@ class TradingChartEngine {
         const entryTag = isSniper ? '🎯 75% OTE' : '50% FVG';
         ctx.fillText(`${setupIcon} ${entryTag} @ ${setup.entryPrice.toFixed(setup.entryPrice > 500 ? 2 : 4)}`, badgeX + (badgeW / 2), badgeY + 15);
 
+        // 5.5. Dual Entry 2 (Deep Near-SL Entry) -> Subtle Thin Light Green Dashed Line
+        const entry2 = setup.entryPrice2;
+        if (entry2 && Math.abs(entry2 - setup.entryPrice) > 0.0001) {
+            const entry2Y = priceToY(entry2);
+
+            // Subtle Light Green Guideline across chart
+            ctx.setLineDash([4, 3]);
+            ctx.strokeStyle = 'rgba(52, 211, 153, 0.85)'; // Soft vibrant mint green
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(runningCandleX, entry2Y);
+            ctx.lineTo(chartW, entry2Y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Floating Light Green Tag Badge
+            const e2BadgeW = 166;
+            const e2BadgeH = 18;
+            const e2BadgeX = startX + (boxWidth - e2BadgeW) / 2;
+            const e2BadgeY = entry2Y - 9;
+
+            ctx.fillStyle = 'rgba(6, 78, 59, 0.94)';
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(e2BadgeX, e2BadgeY, e2BadgeW, e2BadgeH, 3) : ctx.rect(e2BadgeX, e2BadgeY, e2BadgeW, e2BadgeH);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.font = 'bold 9.5px JetBrains Mono';
+            ctx.fillStyle = '#6ee7b7';
+            ctx.textAlign = 'center';
+            ctx.fillText(`🟢 Deep E2 (Near SL) @ ${entry2.toFixed(entry2 > 500 ? 2 : 4)}`, e2BadgeX + (e2BadgeW / 2), e2BadgeY + 12);
+
+            // Right Price Axis Pill for Entry 2
+            ctx.fillStyle = '#059669';
+            ctx.fillRect(chartW, entry2Y - 8, this.priceAxisWidth, 16);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`E2 ${entry2.toFixed(entry2 > 500 ? 2 : 4)}`, chartW + 4, entry2Y + 4);
+        }
+
         // TP Label Inside Fixed Green Box
         ctx.font = 'bold 10px JetBrains Mono';
         ctx.fillStyle = '#34d399';

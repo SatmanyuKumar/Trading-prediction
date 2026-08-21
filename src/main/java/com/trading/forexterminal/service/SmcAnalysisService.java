@@ -590,13 +590,14 @@ public class SmcAnalysisService {
             case "5M", "3M" -> "⚡ Moderate Execution Timeframe (⭐⭐⭐ - HTF Anchored)";
             default -> "⚡ Micro Execution Timeframe (⭐⭐ - Strict HTF Filter)";
         };
+        boolean isLtf = "1M".equalsIgnoreCase(tfUpper) || "3M".equalsIgnoreCase(tfUpper) || "5M".equalsIgnoreCase(tfUpper);
 
-        // Minimum Volatility Buffer per Asset Class (Ensures healthy breathing room against spread & noise)
+        // Minimum Volatility Buffer per Asset Class (Extra safe breathing room on LTF 1m/3m to protect against broker spread & wick spikes)
         double minBuffer = switch (symbol.toUpperCase()) {
-            case "XAUUSD" -> isSniper ? 3.50 : 2.50; // $3.50 minimum floor on Gold (35 pips)
-            case "BTCUSD" -> isSniper ? 120.0 : 80.0; // $120 floor on Bitcoin
-            case "USDJPY" -> isSniper ? 0.20 : 0.15; // 20 pips on Yen
-            default -> isSniper ? 0.00150 : 0.00120;   // 15 pips on EURUSD / GBPUSD
+            case "XAUUSD" -> isLtf ? 5.50 : (isSniper ? 4.50 : 3.50); // $5.50 minimum floor on LTF Gold (55 pips breathing room!)
+            case "BTCUSD" -> isLtf ? 180.0 : (isSniper ? 140.0 : 100.0); // $180 floor on Bitcoin
+            case "USDJPY" -> isLtf ? 0.30 : (isSniper ? 0.22 : 0.18); // 30 pips on Yen
+            default -> isLtf ? 0.00220 : (isSniper ? 0.00180 : 0.00150);   // 22 pips on EURUSD / GBPUSD
         };
         double dynamicAtrBuffer = Math.max(minBuffer, atr14 * atrMultiplier);
 
@@ -648,18 +649,15 @@ public class SmcAnalysisService {
         // 🏛️ INSTITUTIONAL ORDER FLOW & TREND CLASSIFICATION ENGINE
         // Rule: NEVER trade counter-trend! Trade with Higher Timeframe Order Flow.
         // =========================================================================
-        boolean isBullishTrend = (e20 >= e50 && currentPrice >= e50) || (e50 >= e200 && currentPrice >= e20);
-        boolean isBearishTrend = (e20 <= e50 && currentPrice <= e50) || (e50 <= e200 && currentPrice <= e20);
+        boolean isBullishTrend = e20 > e50 && e50 > e200;
+        boolean isBearishTrend = e20 < e50 && e50 < e200;
 
         boolean isBuySignal;
-        if (isBullishTrend && !isBearishTrend) {
-            // Trend is Bullish -> Strict BUY ON PULLBACK to Demand FVG
+        if (isBullishTrend) {
             isBuySignal = true;
-        } else if (isBearishTrend && !isBullishTrend) {
-            // Trend is Bearish -> Strict SELL ON PULLBACK to Supply FVG
+        } else if (isBearishTrend) {
             isBuySignal = false;
         } else {
-            // Consolidation/Equilibrium: Trade towards nearest unmitigated liquidity
             isBuySignal = pricePositionPct <= 50.0;
         }
 
@@ -668,6 +666,7 @@ public class SmcAnalysisService {
             // 🔴 INSTITUTIONAL SELL SETUP (Trend-Aligned Short)
             // =========================================================================
             double entry;
+            double entry2;
             double stopLoss;
             double anchorWickHigh;
 
@@ -705,7 +704,13 @@ public class SmcAnalysisService {
             }
             stopLoss = round(entry + risk, 5);
 
-            // 3. Take Profit Targets (Preserve Full Macro Target / Range Low / Demand)
+            // 3. Dual Entry 2 (Deep Near-SL Entry with ultra-low risk & high R:R)
+            entry2 = round(anchorWickHigh - (spread * 1.5), 5);
+            if (entry2 >= stopLoss || entry2 <= entry) {
+                entry2 = round(stopLoss - (risk * 0.20), 5);
+            }
+
+            // 4. Take Profit Targets (Preserve Full Macro Target / Range Low / Demand)
             double fullDemandTarget = (nearestUnderneathFvg != null) ? nearestUnderneathFvg.getConsequentEncroachment() : underneathDemandLevel;
             double macroTargetSell = Math.min(fullDemandTarget, rangeLow);
             double minSniperTpSell = entry - (risk * tp1Multiplier);
@@ -720,7 +725,7 @@ public class SmcAnalysisService {
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Trend Continuation (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
             confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural High @" + formatPrice(anchorWickHigh, symbol) + " + Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
-            confluences.add(isSniper ? ("🎯 75% Deep OTE Supply Entry: " + formatPrice(entry, symbol)) : (nearestOverheadFvg != null ? "50% C.E. Supply Retest: " + formatPrice(overheadSupplyLevel, symbol) : "Macro Supply Liquidity Pool"));
+            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | Deep Entry 2 (Near SL): " + formatPrice(entry2, symbol));
             confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Short)");
@@ -733,16 +738,17 @@ public class SmcAnalysisService {
                 "### 📚 %s (ICT Bearish Order Flow Blueprint)\n\n" +
                 "1. **Institutional Market Direction:**\n" +
                 "   Market structure on %s is in **Bearish Trend Alignment** seeking downside Discount Liquidity.\n\n" +
-                "2. **Premium Supply Entry Coordination:**\n" +
-                "   Smart money waits for an %s into **%s** (50%% FVG Equilibrium / Supply zone).\n\n" +
+                "2. **Dual Supply Entry Coordination:**\n" +
+                "   • Primary Entry 1: **%s** (50%% FVG / OTE Equilibrium)\n" +
+                "   • Deep Entry 2 (Near SL): **%s** (High R:R Discount Limit)\n\n" +
                 "3. **Wick Anchor & Buffer Invalidation:**\n" +
                 "   SL is placed safely at **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
                 isSniper ? "🎯 Deep Sniper OTE Short Blueprint" : (isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap"),
                 timeframe,
-                isSniper ? "75% Deep OTE Supply Tap" : "Pullback",
                 formatPrice(entry, symbol),
+                formatPrice(entry2, symbol),
                 formatPrice(anchorWickHigh, symbol),
                 String.format("%.0f", calculatePips(symbol, risk)),
                 formatPrice(stopLoss, symbol),
@@ -759,6 +765,7 @@ public class SmcAnalysisService {
                     confidence,
                     currentPrice,
                     entry,
+                    entry2,
                     stopLoss,
                     tp1,
                     tp2,
@@ -773,6 +780,7 @@ public class SmcAnalysisService {
             // 🟢 INSTITUTIONAL BUY SETUP (Trend-Aligned Long)
             // =========================================================================
             double entry;
+            double entry2;
             double stopLoss;
             double anchorWickLow;
 
@@ -810,7 +818,13 @@ public class SmcAnalysisService {
             }
             stopLoss = round(entry - risk, 5);
 
-            // 3. Take Profit Targets (1:5.5+ Asymmetric Expansion)
+            // 3. Dual Entry 2 (Deep Near-SL Entry with ultra-low risk & high R:R)
+            entry2 = round(anchorWickLow + (spread * 1.5), 5);
+            if (entry2 <= stopLoss || entry2 >= entry) {
+                entry2 = round(stopLoss + (risk * 0.20), 5);
+            }
+
+            // 4. Take Profit Targets (1:5.5+ Asymmetric Expansion)
             double fullSupplyTarget = (nearestOverheadFvg != null) ? nearestOverheadFvg.getConsequentEncroachment() : overheadSupplyLevel;
             double macroTargetBuy = Math.max(fullSupplyTarget, rangeHigh);
             double minSniperTpBuy = entry + (risk * tp1Multiplier);
@@ -825,7 +839,7 @@ public class SmcAnalysisService {
             confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Bullish Expansion (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
             confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural Low @" + formatPrice(anchorWickLow, symbol) + " - Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
-            confluences.add(isSniper ? ("🎯 75% Deep OTE Demand Entry: " + formatPrice(entry, symbol)) : (nearestUnderneathFvg != null ? "50% C.E. Demand Retest: " + formatPrice(underneathDemandLevel, symbol) : "Discount Equilibrium Accumulation Retest"));
+            confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | Deep Entry 2 (Near SL): " + formatPrice(entry2, symbol));
             confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Expectancy)");
@@ -838,8 +852,9 @@ public class SmcAnalysisService {
                 "### 📚 %s (ICT OTE & Bullish Expansion Blueprint)\n\n" +
                 "1. **Institutional Target Magnet:**\n" +
                 "   Market is expanding upwards on %s seeking the **Overhead Bearish Supply at %s**.\n\n" +
-                "2. **Discount Entry Coordination:**\n" +
-                "   Smart money waits for an %s into **%s** (50%% FVG Equilibrium / Demand zone).\n\n" +
+                "2. **Dual Demand Entry Coordination:**\n" +
+                "   • Primary Entry 1: **%s** (50%% FVG / OTE Equilibrium)\n" +
+                "   • Deep Entry 2 (Near SL): **%s** (High R:R Discount Limit)\n\n" +
                 "3. **Wick Anchor & Buffer Invalidation:**\n" +
                 "   SL is placed safely below **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
@@ -847,8 +862,8 @@ public class SmcAnalysisService {
                 isSniper ? "🎯 Deep Sniper OTE Long Blueprint" : (isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion"),
                 timeframe,
                 overheadSupplyLevel > 0 ? formatPrice(overheadSupplyLevel, symbol) : "Target Liquidity",
-                isSniper ? "75% Deep OTE Demand Tap" : "Pullback",
                 formatPrice(entry, symbol),
+                formatPrice(entry2, symbol),
                 formatPrice(anchorWickLow, symbol),
                 String.format("%.0f", calculatePips(symbol, risk)),
                 formatPrice(stopLoss, symbol),
@@ -865,6 +880,7 @@ public class SmcAnalysisService {
                     confidence,
                     currentPrice,
                     entry,
+                    entry2,
                     stopLoss,
                     tp1,
                     tp2,
