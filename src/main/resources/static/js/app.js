@@ -1326,6 +1326,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (sugg.triggerState === 'SL_HIT') {
                 stateBadge = '<span class="status-badge loss" style="background:rgba(248, 113, 113, 0.2); border-color:#f87171; color:#f87171; font-weight:bold;">❌ FAILED (🛑 SL HIT)</span>';
                 pnlStr = '<span class="text-down bold">-$' + (sugg.pnl ? Math.abs(Number(sugg.pnl)).toFixed(2) : '0.00') + '</span>';
+            } else if (sugg.triggerState === 'MISSED_RUNAWAY') {
+                stateBadge = '<span class="status-badge" style="background:rgba(120, 53, 15, 0.2); border:1px solid #f59e0b; color:#fde68a; font-weight:bold;">⏭️ MISSED (UNFILLED)</span>';
+                pnlStr = '<span style="color:var(--text-dim);">$0.00 (Untapped)</span>';
+            } else if (sugg.triggerState === 'EXPIRED_UNFILLED') {
+                stateBadge = '<span class="status-badge" style="background:rgba(51, 65, 85, 0.2); border:1px solid #94a3b8; color:#cbd5e1;">❌ EXPIRED (UNFILLED)</span>';
+                pnlStr = '<span style="color:var(--text-dim);">$0.00 (Cancelled)</span>';
             }
 
             tr.innerHTML = 

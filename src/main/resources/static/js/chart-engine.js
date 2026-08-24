@@ -948,16 +948,24 @@ class TradingChartEngine {
             const isTrendShift = setup.status === 'FAILED_TREND_SHIFT';
             const isSlHit = setup.status === 'FAILED_SL';
             const isTpHit = setup.status === 'TP_HIT';
+            const isMissed = setup.status === 'MISSED_RUNAWAY';
+            const isExpired = setup.status === 'EXPIRED_UNFILLED';
 
-            if (isTrendShift) {
+            if (isMissed) {
+                ctx.fillStyle = 'rgba(120, 53, 15, 0.92)'; // Amber Muted
+                ctx.strokeStyle = '#f59e0b';
+            } else if (isTrendShift || isExpired) {
                 ctx.fillStyle = 'rgba(51, 65, 85, 0.92)'; // Slate Muted
                 ctx.strokeStyle = '#94a3b8';
             } else if (isSlHit) {
                 ctx.fillStyle = 'rgba(127, 29, 29, 0.92)'; // Crimson Muted
                 ctx.strokeStyle = '#f87171';
-            } else {
+            } else if (isTpHit) {
                 ctx.fillStyle = 'rgba(6, 78, 59, 0.92)'; // Emerald Muted
                 ctx.strokeStyle = '#34d399';
+            } else {
+                ctx.fillStyle = 'rgba(51, 65, 85, 0.92)';
+                ctx.strokeStyle = '#94a3b8';
             }
             ctx.lineWidth = 1.0;
             ctx.beginPath();
@@ -968,7 +976,10 @@ class TradingChartEngine {
             ctx.font = 'bold 9px JetBrains Mono';
             ctx.textAlign = 'center';
 
-            if (isTrendShift) {
+            if (isMissed) {
+                ctx.fillStyle = '#fde68a';
+                ctx.fillText(`⏭️ MISSED (UNFILLED)`, badgeX + (badgeW / 2), badgeY + 13);
+            } else if (isTrendShift) {
                 ctx.fillStyle = '#e2e8f0';
                 ctx.fillText(`❌ FAILED (TREND SHIFT)`, badgeX + (badgeW / 2), badgeY + 13);
             } else if (isSlHit) {
@@ -977,6 +988,9 @@ class TradingChartEngine {
             } else if (isTpHit) {
                 ctx.fillStyle = '#6ee7b7';
                 ctx.fillText(`🎯 TARGET HIT (+PROFIT)`, badgeX + (badgeW / 2), badgeY + 13);
+            } else if (isExpired) {
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillText(`❌ EXPIRED (UNFILLED)`, badgeX + (badgeW / 2), badgeY + 13);
             } else {
                 ctx.fillStyle = '#cbd5e1';
                 ctx.fillText(`❌ INVALIDATED PAST SETUP`, badgeX + (badgeW / 2), badgeY + 13);

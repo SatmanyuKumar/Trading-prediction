@@ -58,58 +58,23 @@ public class SmcAnalysisService {
 
         if (active != null) {
             boolean isBuy = "BUY".equalsIgnoreCase(active.getSignal());
+            double entry = active.getEntryPrice();
             double sl = active.getStopLoss();
             double tp = active.getTakeProfit1();
-            boolean slHit = false;
-            boolean tpHit = false;
-            boolean trendShift = false;
+            long setupStartTime = active.getStartTimestamp() > 0 ? active.getStartTimestamp() : active.getTimestamp();
 
-            // Check across recent candles if SL or TP was reached
-            int checkStart = Math.max(0, candles.size() - 25);
-            for (int i = checkStart; i < candles.size(); i++) {
-                Candle c = candles.get(i);
-                if (c.getTimestamp() >= active.getTimestamp() - 2000) {
-                    if (isBuy) {
-                        if (c.getLow() <= sl) slHit = true;
-                        if (c.getHigh() >= tp) tpHit = true;
-                    } else {
-                        if (c.getHigh() >= sl) slHit = true;
-                        if (c.getLow() <= tp) tpHit = true;
-                    }
-                }
-            }
-
-            // Also check latest live currentPrice
-            if (isBuy) {
-                if (currentPrice <= sl) slHit = true;
-                if (currentPrice >= tp) tpHit = true;
-            } else {
-                if (currentPrice >= sl) slHit = true;
-                if (currentPrice <= tp) tpHit = true;
-            }
-
-            // Check if market has firmly shifted trend against active trade
-            double e20Val = ema20.get(ema20.size() - 1);
-            double e50Val = ema50.get(ema50.size() - 1);
-            double e200Val = ema200.get(ema200.size() - 1);
-            if (isBuy && (e20Val < e50Val && e50Val < e200Val && currentPrice < active.getEntryPrice() - (Math.abs(active.getEntryPrice() - sl) * 0.35))) {
-                trendShift = true;
-            } else if (!isBuy && (e20Val > e50Val && e50Val > e200Val && currentPrice > active.getEntryPrice() + (Math.abs(sl - active.getEntryPrice()) * 0.35))) {
-                trendShift = true;
-            }
-
-            // Check if trade entered / filled the execution box
+            // 1. First, check if the trade entered / filled the execution box
             if (!active.isTriggered()) {
                 boolean filled = false;
-                for (int i = checkStart; i < candles.size(); i++) {
+                for (int i = 0; i < candles.size(); i++) {
                     Candle c = candles.get(i);
-                    if (c.getTimestamp() >= active.getTimestamp() - 2000) {
-                        if (isBuy && c.getLow() <= active.getEntryPrice()) filled = true;
-                        if (!isBuy && c.getHigh() >= active.getEntryPrice()) filled = true;
+                    if (c.getTimestamp() >= setupStartTime) {
+                        if (isBuy && c.getLow() <= entry) filled = true;
+                        if (!isBuy && c.getHigh() >= entry) filled = true;
                     }
                 }
-                if (isBuy && currentPrice <= active.getEntryPrice()) filled = true;
-                if (!isBuy && currentPrice >= active.getEntryPrice()) filled = true;
+                if (isBuy && currentPrice <= entry) filled = true;
+                if (!isBuy && currentPrice >= entry) filled = true;
 
                 if (filled) {
                     active.setTriggered(true);
@@ -117,9 +82,87 @@ public class SmcAnalysisService {
                 }
             }
 
-            if (slHit || tpHit || trendShift) {
+            boolean isResolved = false;
+            String resolutionStatus = "ACTIVE";
+
+            if (active.isTriggered()) {
+                // 2A. TRADE WAS TRIGGERED / LIVE IN-BOX -> Now evaluate SL or TP hit
+                long triggeredTime = active.getTriggeredTimestamp() > 0 ? active.getTriggeredTimestamp() : setupStartTime;
+                boolean slHit = false;
+                boolean tpHit = false;
+                boolean trendShift = false;
+
+                for (int i = 0; i < candles.size(); i++) {
+                    Candle c = candles.get(i);
+                    if (c.getTimestamp() >= triggeredTime - 2000) {
+                        if (isBuy) {
+                            if (c.getLow() <= sl) slHit = true;
+                            if (c.getHigh() >= tp) tpHit = true;
+                        } else {
+                            if (c.getHigh() >= sl) slHit = true;
+                            if (c.getLow() <= tp) tpHit = true;
+                        }
+                    }
+                }
+
+                if (isBuy) {
+                    if (currentPrice <= sl) slHit = true;
+                    if (currentPrice >= tp) tpHit = true;
+                } else {
+                    if (currentPrice >= sl) slHit = true;
+                    if (currentPrice <= tp) tpHit = true;
+                }
+
+                // Check if market has firmly shifted trend against active trade
+                double e20Val = ema20.get(ema20.size() - 1);
+                double e50Val = ema50.get(ema50.size() - 1);
+                double e200Val = ema200.get(ema200.size() - 1);
+                if (isBuy && (e20Val < e50Val && e50Val < e200Val && currentPrice < entry - (Math.abs(entry - sl) * 0.35))) {
+                    trendShift = true;
+                } else if (!isBuy && (e20Val > e50Val && e50Val > e200Val && currentPrice > entry + (Math.abs(sl - entry) * 0.35))) {
+                    trendShift = true;
+                }
+
+                if (slHit || tpHit || trendShift) {
+                    isResolved = true;
+                    resolutionStatus = tpHit ? "TP_HIT" : (trendShift ? "FAILED_TREND_SHIFT" : "FAILED_SL");
+                }
+            } else {
+                // 2B. TRADE WAS NEVER TRIGGERED (PENDING LIMIT ORDER)
+                // If price runs away and reaches target without tapping entry -> MISSED RUNAWAY!
+                boolean targetReachedUntriggered = false;
+                for (int i = 0; i < candles.size(); i++) {
+                    Candle c = candles.get(i);
+                    if (c.getTimestamp() >= setupStartTime) {
+                        if (isBuy && c.getHigh() >= tp) targetReachedUntriggered = true;
+                        if (!isBuy && c.getLow() <= tp) targetReachedUntriggered = true;
+                    }
+                }
+                if (isBuy && currentPrice >= tp) targetReachedUntriggered = true;
+                if (!isBuy && currentPrice <= tp) targetReachedUntriggered = true;
+
+                // Also check if trend has completely shifted away without ever tapping
+                double e20Val = ema20.get(ema20.size() - 1);
+                double e50Val = ema50.get(ema50.size() - 1);
+                double e200Val = ema200.get(ema200.size() - 1);
+                boolean trendShiftUntriggered = false;
+                if (isBuy && (e20Val < e50Val && e50Val < e200Val && currentPrice < sl)) {
+                    trendShiftUntriggered = true;
+                } else if (!isBuy && (e20Val > e50Val && e50Val > e200Val && currentPrice > sl)) {
+                    trendShiftUntriggered = true;
+                }
+
+                if (targetReachedUntriggered) {
+                    isResolved = true;
+                    resolutionStatus = "MISSED_RUNAWAY"; // ⏭️ Untapped Runaway! Not TP Hit!
+                } else if (trendShiftUntriggered) {
+                    isResolved = true;
+                    resolutionStatus = "EXPIRED_UNFILLED"; // ❌ Invalidated before fill!
+                }
+            }
+
+            if (isResolved) {
                 // Setup is resolved -> Archive and allow next structural setup to appear!
-                String resolutionStatus = tpHit ? "TP_HIT" : (trendShift ? "FAILED_TREND_SHIFT" : "FAILED_SL");
                 active.setStatus(resolutionStatus);
                 active.setEndTimestamp(System.currentTimeMillis());
 
