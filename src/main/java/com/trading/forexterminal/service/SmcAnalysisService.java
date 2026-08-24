@@ -778,24 +778,37 @@ public class SmcAnalysisService {
         double distToOverheadSupplyPct = (Math.abs(overheadSupplyLevel - currentPrice) / currentPrice) * 100.0;
         double distToUnderneathDemandPct = (Math.abs(currentPrice - underneathDemandLevel) / currentPrice) * 100.0;
 
+        double adx14 = calculateADX(candles, 14);
+        boolean isChoppy = adx14 < 18.0;
+        boolean hasDisplacement = checkDisplacement(candles, atr14);
+        boolean bslSwept = checkBslSweep(candles, rangeHigh);
+        boolean sslSwept = checkSslSweep(candles, rangeLow);
+
         List<String> confluences = new ArrayList<>();
         int confidence = 85;
 
         // =========================================================================
         // 🏛️ INSTITUTIONAL ORDER FLOW & TREND CLASSIFICATION ENGINE
-        // Rule: NEVER trade counter-trend! Trade with Higher Timeframe Order Flow.
+        // Rule: NEVER trade counter-trend! Always trade with the dominant trend.
         // =========================================================================
-        boolean isBullishTrend = e20 > e50 && e50 > e200;
-        boolean isBearishTrend = e20 < e50 && e50 < e200;
+        boolean isBullishTrend = (e20 >= e50);
+        boolean isBearishTrend = (e20 < e50);
+        boolean isBullishOrderFlow = isBullishTrend;
+        boolean isBearishOrderFlow = isBearishTrend;
 
         boolean isBuySignal;
         if (isBullishTrend) {
-            isBuySignal = true;
+            isBuySignal = true; // In Bull trend, ALWAYS look for Buy Limit on Pullback to Demand
         } else if (isBearishTrend) {
-            isBuySignal = false;
+            isBuySignal = false; // In Bear trend, ALWAYS look for Sell Limit on Pullback to Supply
         } else {
             isBuySignal = pricePositionPct <= 50.0;
         }
+
+        if (bslSwept) confluences.add("🎯 Liquidity Sweep: Buy-side Liquidity (BSL) Swept above " + formatPrice(rangeHigh, symbol));
+        if (sslSwept) confluences.add("🎯 Liquidity Sweep: Sell-side Liquidity (SSL) Swept below " + formatPrice(rangeLow, symbol));
+        if (hasDisplacement) confluences.add("⚡ Institutional Displacement: High-Energy Expansion Body detected");
+        confluences.add("Trend Strength: ADX(14)=" + String.format("%.1f", adx14) + (adx14 >= 25 ? " (Strong Institutional Momentum)" : " (Moderate Flow)"));
 
         if (!isBuySignal) {
             // =========================================================================
@@ -853,12 +866,12 @@ public class SmcAnalysisService {
             double calculatedRr = round(Math.abs(entry - tp1) / Math.max(0.001, risk), 1);
             double bufferApplied = Math.abs(stopLoss - anchorWickHigh);
 
-            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSniper ? 95 : (isScalp ? 92 : (isIntraday ? 94 : 96))) : 88;
+            confidence = (nearestOverheadFvg != null && isBearishOrderFlow) ? (isSniper ? 95 : (isScalp ? 92 : (isIntraday ? 94 : 96))) : 88;
 
             String modeName = isSniper ? "🎯 Deep Sniper (1:6.0+ Small Capital)" : (isScalp ? "⚡ Scalp (1:1.8 Quick Cashflow)" : (isIntraday ? "🎯 Intraday (1:2.8 Session Expansion)" : (isPositional ? "🏛️ Positional (1:7.5 Macro Trend)" : "🌊 Swing (1:4.5 Weekly Leg)")));
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
             confluences.add("Mode: " + modeName);
-            confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
+            confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishOrderFlow ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural High @" + formatPrice(anchorWickHigh, symbol) + " + Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
             confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
             confluences.add("Target Direction: Discount Demand / SSL Pool at " + formatPrice(underneathDemandLevel, symbol));
@@ -967,12 +980,12 @@ public class SmcAnalysisService {
             double calculatedRr = round(Math.abs(tp1 - entry) / Math.max(0.001, risk), 1);
             double bufferApplied = Math.abs(anchorWickLow - stopLoss);
 
-            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSniper ? 95 : (isScalp ? 92 : (isIntraday ? 94 : 96))) : 88;
+            confidence = (nearestUnderneathFvg != null && isBullishOrderFlow) ? (isSniper ? 95 : (isScalp ? 92 : (isIntraday ? 94 : 96))) : 88;
 
             String modeName = isSniper ? "🎯 Deep Sniper (1:6.0+ Small Capital)" : (isScalp ? "⚡ Scalp (1:1.8 Quick Cashflow)" : (isIntraday ? "🎯 Intraday (1:2.8 Session Expansion)" : (isPositional ? "🏛️ Positional (1:7.5 Macro Trend)" : "🌊 Swing (1:4.5 Weekly Leg)")));
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
             confluences.add("Mode: " + modeName);
-            confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
+            confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishOrderFlow ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural Low @" + formatPrice(anchorWickLow, symbol) + " - Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
             confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
             confluences.add("Overhead Target Magnet: Bearish Supply / BSL Expansion at " + formatPrice(overheadSupplyLevel, symbol));
@@ -1408,6 +1421,90 @@ public class SmcAnalysisService {
         });
 
         return radarList;
+    }
+
+    public double calculateADX(List<Candle> candles, int period) {
+        if (candles == null || candles.size() < period * 2) return 25.0;
+        int n = candles.size();
+        double[] tr = new double[n];
+        double[] plusDm = new double[n];
+        double[] minusDm = new double[n];
+
+        for (int i = 1; i < n; i++) {
+            Candle curr = candles.get(i);
+            Candle prev = candles.get(i - 1);
+
+            double hDiff = curr.getHigh() - prev.getHigh();
+            double lDiff = prev.getLow() - curr.getLow();
+
+            plusDm[i] = (hDiff > lDiff && hDiff > 0) ? hDiff : 0.0;
+            minusDm[i] = (lDiff > hDiff && lDiff > 0) ? lDiff : 0.0;
+
+            double tr1 = curr.getHigh() - curr.getLow();
+            double tr2 = Math.abs(curr.getHigh() - prev.getClose());
+            double tr3 = Math.abs(curr.getLow() - prev.getClose());
+            tr[i] = Math.max(tr1, Math.max(tr2, tr3));
+        }
+
+        double smoothTr = 0, smoothPlus = 0, smoothMinus = 0;
+        for (int i = 1; i <= period; i++) {
+            smoothTr += tr[i];
+            smoothPlus += plusDm[i];
+            smoothMinus += minusDm[i];
+        }
+
+        double[] dx = new double[n];
+        for (int i = period + 1; i < n; i++) {
+            smoothTr = smoothTr - (smoothTr / period) + tr[i];
+            smoothPlus = smoothPlus - (smoothPlus / period) + plusDm[i];
+            smoothMinus = smoothMinus - (smoothMinus / period) + minusDm[i];
+
+            double plusDi = (smoothPlus / Math.max(0.0001, smoothTr)) * 100.0;
+            double minusDi = (smoothMinus / Math.max(0.0001, smoothTr)) * 100.0;
+
+            double diDiff = Math.abs(plusDi - minusDi);
+            double diSum = plusDi + minusDi;
+            dx[i] = (diDiff / Math.max(0.0001, diSum)) * 100.0;
+        }
+
+        double sumDx = 0;
+        int count = 0;
+        for (int i = n - period; i < n; i++) {
+            sumDx += dx[i];
+            count++;
+        }
+        return count > 0 ? sumDx / count : 25.0;
+    }
+
+    private boolean checkDisplacement(List<Candle> candles, double atr) {
+        if (candles == null || candles.size() < 5) return true;
+        int n = candles.size();
+        for (int i = n - 5; i < n; i++) {
+            Candle c = candles.get(i);
+            double body = Math.abs(c.getClose() - c.getOpen());
+            if (body >= atr * 0.80) return true;
+        }
+        return false;
+    }
+
+    private boolean checkBslSweep(List<Candle> candles, double rangeHigh) {
+        if (candles == null || candles.size() < 10) return false;
+        int n = candles.size();
+        for (int i = n - 8; i < n; i++) {
+            Candle c = candles.get(i);
+            if (c.getHigh() >= rangeHigh && c.getClose() < rangeHigh) return true;
+        }
+        return false;
+    }
+
+    private boolean checkSslSweep(List<Candle> candles, double rangeLow) {
+        if (candles == null || candles.size() < 10) return false;
+        int n = candles.size();
+        for (int i = n - 8; i < n; i++) {
+            Candle c = candles.get(i);
+            if (c.getLow() <= rangeLow && c.getClose() > rangeLow) return true;
+        }
+        return false;
     }
 
     private double round(double val, int decimals) {

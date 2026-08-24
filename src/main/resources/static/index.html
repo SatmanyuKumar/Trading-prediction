@@ -503,9 +503,11 @@
                     <div class="backtest-input-group">
                         <label>Strategy Mode:</label>
                         <select id="backtest-mode" class="modal-select">
-                            <option value="SCALP" selected>⚡ Scalp Mode (1:3.0 R:R)</option>
-                            <option value="SWING">🌊 Swing Mode (1:4.5+ R:R)</option>
-                            <option value="SNIPER">🎯 Deep Sniper Mode (1:8.0+ R:R Small Cap OTE)</option>
+                            <option value="SCALP" selected>⚡ Scalp Mode (1m-5m | 1:1.8 R:R)</option>
+                            <option value="INTRADAY">🎯 Intraday Mode (15m-1h | 1:2.8 R:R)</option>
+                            <option value="SWING">🌊 Swing Mode (4h-1D | 1:4.5 R:R)</option>
+                            <option value="POSITIONAL">🏛️ Positional Mode (1D | 1:7.5+ R:R)</option>
+                            <option value="SNIPER">🎯 Deep Sniper Mode (Small Capital | 1:6.0+ R:R)</option>
                         </select>
                     </div>
 
@@ -879,7 +881,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart-engine.js?v=6.3"></script>
-    <script src="js/app.js?v=6.3"></script>
+    <script src="js/chart-engine.js?v=6.4"></script>
+    <script src="js/app.js?v=6.4"></script>
 </body>
 </html>
