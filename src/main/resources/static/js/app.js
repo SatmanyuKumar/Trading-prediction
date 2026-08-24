@@ -474,7 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'SCALP': ['1m', '3m', '5m'],
         'INTRADAY': ['15m', '30m', '1h'],
         'SWING': ['4h', '1d'],
-        'POSITIONAL': ['1d']
+        'POSITIONAL': ['1d'],
+        'SNIPER': ['1m', '3m', '5m', '15m']
     };
 
     function syncTimeframeModeUI(mode, tf) {
@@ -1189,6 +1190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!sugg) return 'SCALP';
         const m = (sugg.mode || sugg.strategyMode || '').toUpperCase();
         const type = (sugg.setupType || '').toUpperCase();
+        if (m === 'SNIPER' || type.includes('SNIPER') || type.includes('OTE')) return 'SNIPER';
         if (m === 'POSITIONAL' || type.includes('POSITION') || type.includes('MACRO')) return 'POSITIONAL';
         if (m === 'SWING' || type.includes('SWING')) return 'SWING';
         if (m === 'INTRADAY' || type.includes('INTRADAY')) return 'INTRADAY';
@@ -1217,20 +1219,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = state.suggestions || [];
         positionsTbody.innerHTML = '';
 
-        // 1. Calculate counts for each of the 4 separate sections
+        // 1. Calculate counts for each of the 5 separate sections
         const scalpList = list.filter(s => getNormalizedSuggMode(s) === 'SCALP');
         const intradayList = list.filter(s => getNormalizedSuggMode(s) === 'INTRADAY');
         const swingList = list.filter(s => getNormalizedSuggMode(s) === 'SWING');
         const positionalList = list.filter(s => getNormalizedSuggMode(s) === 'POSITIONAL');
+        const sniperList = list.filter(s => getNormalizedSuggMode(s) === 'SNIPER');
 
         const suggCountIntraday = document.getElementById('sugg-count-intraday');
         const suggCountPositional = document.getElementById('sugg-count-positional');
+        const suggCountSniper = document.getElementById('sugg-count-sniper');
 
         if (suggCountAll) suggCountAll.textContent = list.length;
         if (suggCountScalp) suggCountScalp.textContent = scalpList.length;
         if (suggCountIntraday) suggCountIntraday.textContent = intradayList.length;
         if (suggCountSwing) suggCountSwing.textContent = swingList.length;
         if (suggCountPositional) suggCountPositional.textContent = positionalList.length;
+        if (suggCountSniper) suggCountSniper.textContent = sniperList.length;
 
         // 2. Select filtered dataset based on active filter chip
         let filteredList = list;
@@ -1247,6 +1252,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (state.suggFilter === 'POSITIONAL') {
             filteredList = positionalList;
             modeLabel = '🏛️ Positional Mode (1D-1W)';
+        } else if (state.suggFilter === 'SNIPER') {
+            filteredList = sniperList;
+            modeLabel = '🎯 Deep Sniper Mode (Small Capital)';
         }
 
         if (suggFilterStats) {
@@ -1302,6 +1310,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 modeBadge = '<span class="mode-pill swing" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🌊 SWING</span>';
             } else if (normMode === 'POSITIONAL') {
                 modeBadge = '<span class="mode-pill positional" style="background:rgba(234,179,8,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🏛️ POSITIONAL</span>';
+            } else if (normMode === 'SNIPER') {
+                modeBadge = '<span class="mode-pill sniper" style="background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🎯 SNIPER</span>';
             }
 
             let stateBadge = '<span class="status-badge breakeven">⏳ PENDING PULLBACK</span>';
