@@ -321,7 +321,7 @@ public class MarketDataService {
                     }
                 } else if ("READY_EXECUTED".equals(state)) {
                     // Trade is active: check Pass (TP Hit) vs Fail (SL Hit)
-                    double mult = "BTCUSD".equals(pair) ? 1.0 : ("XAUUSD".equals(pair) ? 100.0 : 100000.0);
+                    double mult = "BTCUSD".equals(pair) ? 1.0 : ("XAUUSD".equals(pair) ? 100.0 : (pair.contains("JPY") ? 1000.0 : 100000.0));
                     double defaultLots = 0.10;
 
                     if ("BUY".equals(sugg.getSignal())) {
