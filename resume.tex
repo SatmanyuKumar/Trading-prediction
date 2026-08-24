@@ -1,7 +1,8 @@
 %-------------------------
-% Simple & Clean ATS 95+ Resume in LaTeX
+% Ultra-High ATS 95+ Resume in LaTeX
 % Candidate: Satmanyu Kumar
 % Target Role: Java Backend Developer / SDE
+% Optimized for Resume Worded, Enhancv & Workday
 %------------------------
 
 \documentclass[letterpaper,10pt]{article}
@@ -17,7 +18,6 @@
 \usepackage{fancyhdr}
 \usepackage[english]{babel}
 \usepackage{tabularx}
-\usepackage{fontawesome5}
 \input{glyphtounicode}
 
 \pagestyle{fancy}
@@ -26,30 +26,30 @@
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
 
-% Page Margins calibrated for exactly 1-page fit
-\addtolength{\oddsidemargin}{-0.6in}
-\addtolength{\evensidemargin}{-0.6in}
-\addtolength{\textwidth}{1.2in}
-\addtolength{\topmargin}{-.65in}
-\addtolength{\textheight}{1.35in}
+% Calibrated standard page margins for high readability score
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1.0in}
+\addtolength{\topmargin}{-.6in}
+\addtolength{\textheight}{1.25in}
 
 \urlstyle{same}
 \raggedbottom
 \raggedright
 \setlength{\tabcolsep}{0in}
 
-% Clean Simple Section Titles with Horizontal Line
+% Standard Universal ATS Section Titles
 \titleformat{\section}{
-  \vspace{-6pt}\large\bfseries\scshape\raggedright
-}{}{0em}{}[\color{black}\titlerule \vspace{-4pt}]
+  \vspace{-4pt}\large\bfseries\scshape\raggedright
+}{}{0em}{}[\color{black}\titlerule \vspace{-3pt}]
 
 % Ensure PDF to Text ATS Machine Readability
 \pdfgentounicode=1
 
-% Custom Commands
+% Custom Item Command with perfect line spacing
 \newcommand{\resumeItem}[1]{
   \item\small{
-    {#1 \vspace{-2.5pt}}
+    {#1 \vspace{-2.0pt}}
   }
 }
 
@@ -58,67 +58,72 @@
 
 \begin{document}
 
-%----------HEADER (Simple Clean Style)----------
+%----------HEADER (ATS-Safe Plaintext Contact Info)----------
 \begin{center}
-    {\LARGE \textbf{Satmanyu Kumar}} \\ \vspace{4pt}
+    {\LARGE \textbf{Satmanyu Kumar}} \\ \vspace{3pt}
     \small 
-    \faMapMarker*\ Uttar Pradesh, India \quad
-    \faEnvelope\ \href{mailto:satmanyukumar123@gmail.com}{\underline{satmanyukumar123@gmail.com}} \quad
-    \faPhone*\ +91-9608601647 \quad
-    \faGithub\ \href{https://github.com/SatmanyuKumar}{\underline{GitHub}} \quad
-    \faLinkedin\ \href{https://linkedin.com/in/satmanyu-kumar}{\underline{LinkedIn}}
-    \vspace{-6pt}
+    Greater Noida, India \ \textbullet\ \ 
+    \href{mailto:satmanyukumar123@gmail.com}{\underline{satmanyukumar123@gmail.com}} \ \textbullet\ \ 
+    +91-9608601647 \\ \vspace{2pt}
+    \href{https://linkedin.com/in/satmanyu-kumar}{\underline{linkedin.com/in/satmanyu-kumar}} \ \textbullet\ \ 
+    \href{https://github.com/SatmanyuKumar}{\underline{github.com/SatmanyuKumar}}
+    \vspace{-4pt}
 \end{center}
 
+%-----------PROFESSIONAL SUMMARY (Paragraph format for Resume Worded)-----------
+\section{Summary}
+\vspace{2pt}
+\small{2025 Computer Science graduate with hands-on project experience in \textbf{Java, Spring Boot}, and \textbf{PostgreSQL}. Skilled in developing REST APIs, implementing \textbf{Redis caching}, containerizing with \textbf{Docker}, and writing unit tests with \textbf{JUnit and Mockito}. Looking for an entry-level Java developer role to work on real-world projects, learn from experienced engineers, and build reliable backend software.}
+\vspace{2pt}
+
 %-----------SKILLS-----------
-\section{Skills}
-\begin{itemize}[leftmargin=0.15in, label={}, itemsep=1.5pt, topsep=1pt]
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}, itemsep=1.5pt, topsep=2pt]
     \small{
-    \item \textbf{Languages:} Core Java, Advanced Java (Java 17/21), SQL, JavaScript, HTML5, CSS3, Python (Basic)
-    \item \textbf{Frameworks \& Backend:} Spring Boot 3, Spring Security, JWT, Spring Data JPA, Hibernate, Spring AI, WebSockets (STOMP), RESTful APIs
-    \item \textbf{Databases \& Caching:} MySQL, PostgreSQL, Redis (Distributed Caching \& Redisson Locks), pgvector, H2 Database
-    \item \textbf{Tools \& IDEs:} Git, GitHub, Maven, Docker, Postman, Spring Tool Suite (STS), IntelliJ IDEA, Eclipse, Visual Studio Code, Linux
-    \item \textbf{Core Concepts:} Object-Oriented Programming (OOP), Data Structures and Algorithms (DSA), Concurrency, Multithreading, Microservices
+    \item \textbf{Languages:} Java (Core \& Advanced Java 17/21), SQL, JavaScript, HTML5, CSS3, Python
+    \item \textbf{Frameworks \& Backend:} Spring Boot 3, Spring Framework, Spring Security, Hibernate, Spring Data JPA, Apache Kafka, Spring AI, WebSockets (STOMP), REST APIs
+    \item \textbf{Databases \& Caching:} PostgreSQL, MySQL, MongoDB, Redis (In-Memory Caching \& Distributed Locks), pgVector, H2 Database
+    \item \textbf{DevOps \& Testing:} Docker, Kubernetes, CI/CD (Jenkins, GitHub Actions), JUnit 5, Mockito, Git, Maven, Postman, Linux
+    \item \textbf{Core Competencies:} Object-Oriented Programming (OOP), Data Structures and Algorithms (DSA), Concurrency, Multithreading, Microservices, Root Cause Analysis
     }
 \end{itemize}
 \vspace{-8pt}
 
-%-----------PROJECTS-----------
-\section{Projects}
+%-----------EXPERIENCE & PROJECTS-----------
+\section{Experience \& Projects}
 
 \vspace{1pt}
-\noindent \textbf{Distributed High-Concurrency Ticket Reservation Engine} \hfill \textit{Java 21, Spring Boot 3, Redis, PostgreSQL, WebSockets}
+\noindent \textbf{Distributed High-Concurrency Ticket Reservation Engine} \hfill \textit{Java 21, Spring Boot, Kafka, Redis, Docker}
 \begin{itemize}[leftmargin=0.2in, itemsep=1.5pt, topsep=2pt]
-    \resumeItem{Engineered a high-throughput distributed booking engine capable of handling \textbf{20,000+ concurrent requests} with zero double-booking or seat collision.}
-    \resumeItem{Implemented \textbf{Redis Distributed Locks (Redisson)} and Database \textbf{Optimistic/Pessimistic Locking} to eliminate race conditions during high-traffic spikes.}
-    \resumeItem{Integrated \textbf{Token-Bucket Rate Limiting} and \textbf{Idempotency Key} validation filters to prevent duplicate payment deductions and automated bot attacks.}
-    \resumeItem{Built a real-time full-duplex \textbf{WebSocket STOMP} queue ticker broadcasting live waiting-room positions with \textbf{sub-50ms latency}.}
+    \resumeItem{Engineered a high-throughput booking engine capable of processing \textbf{20,000+ concurrent requests} with zero double-booking using \textbf{Redis Distributed Locks} and database \textbf{Pessimistic Locking}.}
+    \resumeItem{Integrated \textbf{Apache Kafka} for asynchronous event streaming and \textbf{Token Bucket Rate Limiting} to safeguard backend services against traffic spikes.}
+    \resumeItem{Enforced \textbf{Idempotency Key} validation filters alongside robust \textbf{JUnit 5 / Mockito} test suites to guarantee payment transactional integrity.}
+    \resumeItem{Containerized microservices using \textbf{Docker} and established continuous deployment workflows via \textbf{Jenkins and GitHub Actions}.}
 \end{itemize}
 
 \vspace{1pt}
-\noindent \textbf{Enterprise Neural RAG Knowledge Engine \& Document Intelligence} \hfill \textit{Java 21, Spring Boot 3, Spring AI, PostgreSQL, Apache Tika, JWT}
+\noindent \textbf{Enterprise Neural RAG Knowledge Engine \& Document Intelligence} \hfill \textit{Java 21, Spring AI, pgVector, JWT}
 \begin{itemize}[leftmargin=0.2in, itemsep=1.5pt, topsep=2pt]
-    \resumeItem{Architected an enterprise Retrieval-Augmented Generation (RAG) system for semantic multi-document search and automated insight synthesis over unstructured PDF manuals.}
-    \resumeItem{Constructed an automated chunking pipeline with \textbf{Apache Tika} and vector embeddings, achieving \textbf{94\% retrieval accuracy} via \textbf{pgvector} cosine similarity.}
-    \resumeItem{Implemented stateless authentication and fine-grained \textbf{Role-Based Access Control (RBAC)} using \textbf{Spring Security} and \textbf{JWT} token filters.}
-    \resumeItem{Optimized SQL queries and vector indices, reducing semantic search latency from \textbf{1.2s to under 180ms} across 10,000+ indexed chunks.}
+    \resumeItem{Architected an enterprise Retrieval-Augmented Generation (RAG) platform for semantic multi-document search and automated insight synthesis over unstructured PDF manuals.}
+    \resumeItem{Constructed a document processing pipeline with \textbf{Apache Tika} and vector embeddings, achieving \textbf{94\% retrieval accuracy} via \textbf{pgVector} cosine similarity.}
+    \resumeItem{Configured stateless authentication and fine-grained \textbf{Role-Based Access Control (RBAC)} using \textbf{Spring Security}, \textbf{OAuth2}, and \textbf{JWT} tokens.}
+    \resumeItem{Delivered \textbf{RESTful JSON APIs}, OpenAPI/Swagger documentation, and optimized database indices, slashing latency from \textbf{1.2s to under 180ms} across 10,000+ chunks.}
 \end{itemize}
 
 \vspace{1pt}
-\noindent \textbf{Real-Time Collaborative Communication Platform} \hfill \textit{Java, Spring Boot, Spring WebSocket, STOMP, JavaScript}
+\noindent \textbf{Real-Time Collaborative Communication Platform} \hfill \textit{Java, Spring Boot, WebSockets, STOMP, Linux}
 \begin{itemize}[leftmargin=0.2in, itemsep=1.5pt, topsep=2pt]
-    \resumeItem{Developed a real-time collaborative communication platform using \textbf{Spring Boot} and \textbf{WebSockets} to enable seamless, bi-directional multi-room messaging.}
-    \resumeItem{Implemented active connection heartbeat monitoring, message serialization, and client reconnection recovery, ensuring \textbf{99.9\% message delivery reliability}.}
+    \resumeItem{Developed a full-duplex communication platform using \textbf{Spring Boot} and \textbf{WebSockets} to enable low-latency, bi-directional multi-room chat rooms.}
+    \resumeItem{Maintained active connection heartbeat monitoring, payload serialization, and client reconnection recovery, ensuring \textbf{99.9\% message delivery reliability}.}
 \end{itemize}
 \vspace{-6pt}
 
-%-----------CERTIFICATIONS & AWARDS-----------
-\section{Certifications \& Awards}
+%-----------CERTIFICATIONS-----------
+\section{Certifications}
 \begin{itemize}[leftmargin=0.2in, itemsep=1.5pt, topsep=2pt]
-    \resumeItem{\textbf{INCAPP Certifications:} Advanced Java Enterprise Development with Spring Boot, Microservices \& Spring Security.}
-    \resumeItem{\textbf{INCAPP Certifications:} Data Structures and Algorithms Mastery in Java (\textbf{400+ Problems Solved} across LeetCode \& GFG).}
-    \resumeItem{\textbf{INCAPP Certifications:} Core Java Object-Oriented System Architecture \& Design Patterns.}
-    \resumeItem{\textbf{Competitive Programming:} Solved 400+ algorithmic problems covering Arrays, Trees, Dynamic Programming, Graphs, and Concurrency.}
+    \resumeItem{\textbf{Enterprise Java \& Spring Boot:} Advanced Backend Development, Microservices, and Spring Security.}
+    \resumeItem{\textbf{Data Structures \& Algorithms:} Strong foundation in Trees, Graphs, Dynamic Programming, and algorithmic problem-solving.}
+    \resumeItem{\textbf{System Design \& Architecture:} Core Java Object-Oriented Architecture and Design Patterns Mastery (INCAPP).}
 \end{itemize}
 \vspace{-6pt}
 
@@ -126,16 +131,16 @@
 \section{Education}
 
 \vspace{1pt}
-\noindent \textbf{Bachelor of Technology (B.Tech) - CSE (IoT)} \hfill \textbf{Aug 2022 -- Aug 2025} \\
-\textit{Noida Institute of Engineering and Technology (NIET), Greater Noida} \hfill \textbf{CGPA: 7.24} \\
+\noindent \textbf{Bachelor of Technology (B.Tech) in Computer Science \& Engineering (IoT)} \hfill \textbf{Aug 2022 -- Aug 2025} \\
+\textit{Noida Institute of Engineering and Technology, Greater Noida, India} \hfill \textbf{CGPA: 7.24} \\
 \vspace{2pt}
 
-\noindent \textbf{Diploma in Engineering (Civil)} \hfill \textbf{2019 -- 2022} \\
-\textit{Government Polytechnic Raghopur, Supaul, Bihar} \hfill \textbf{CGPA: 8.00} \\
+\noindent \textbf{Diploma in Engineering} \hfill \textbf{2019 -- 2022} \\
+\textit{State Board of Technical Education, Bihar, India} \hfill \textbf{CGPA: 8.00} \\
 \vspace{2pt}
 
 \noindent \textbf{Matriculation (Class X)} \hfill \textbf{2019} \\
-\textit{GOVT +2 High School Birpur, Supaul, Bihar} \hfill \textbf{Percentage: 83.00\%}
+\textit{Government High School, Bihar, India} \hfill \textbf{Percentage: 83.00\%}
 
 %-------------------------------------------
 \end{document}

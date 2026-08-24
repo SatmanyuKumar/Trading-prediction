@@ -75,9 +75,10 @@
                 <div class="divider"></div>
 
                 <div class="tool-group trade-mode-group" id="trade-mode-selector">
-                    <button class="trade-mode-btn active" id="btn-mode-scalp" data-tmode="SCALP" title="Fast momentum, micro FVG taps, tight 1.2x ATR stop loss (1:2.2 R:R)">⚡ Scalp Mode</button>
-                    <button class="trade-mode-btn" id="btn-mode-swing" data-tmode="SWING" title="Macro Order Blocks, wide structural 2.5x ATR buffer (1:4.5+ R:R)">🌊 Swing Mode</button>
-                    <button class="trade-mode-btn" id="btn-mode-sniper" data-tmode="SNIPER" title="Deep 80% OTE Retest, Ultra-tight Invalidation SL, 1:8+ R:R (Optimized for $20, $30, $100 Small Capital)">🎯 Deep Sniper (Small Cap)</button>
+                    <button class="trade-mode-btn active" id="btn-mode-scalp" data-tmode="SCALP" title="Fast Micro Scalp (1m, 3m, 5m | 1:1.8 R:R Quick Exit)">⚡ Scalp (1m-5m)</button>
+                    <button class="trade-mode-btn" id="btn-mode-intraday" data-tmode="INTRADAY" title="Session Momentum (15m, 30m, 1h | 1:2.8 R:R Expansion)">🎯 Intraday (15m-1h)</button>
+                    <button class="trade-mode-btn" id="btn-mode-swing" data-tmode="SWING" title="Multi-Day Order Flow (4h, 1D | 1:4.5 R:R Weekly Leg)">🌊 Swing (4h-1D)</button>
+                    <button class="trade-mode-btn" id="btn-mode-positional" data-tmode="POSITIONAL" title="Macro Positional (1D | 1:7.5+ R:R Structural Shift)">🏛️ Positional (1D)</button>
                 </div>
 
                 <div class="divider"></div>
@@ -220,13 +221,14 @@
                     </div>
                 </div>
 
-                <!-- AI Setup History 3-Mode Segmentation Bar (⚡ Scalp vs 🌊 Swing vs 🎯 Deep Sniper) -->
+                <!-- AI Setup History 4-Tier Segmentation Bar (⚡ Scalp vs 🎯 Intraday vs 🌊 Swing vs 🏛️ Positional) -->
                 <div class="sugg-filter-bar hidden" id="sugg-filter-bar">
                     <span class="sugg-filter-label">🔍 Filter Strategy:</span>
                     <button class="sugg-chip active" data-smode="ALL">🌐 All Modes (<span id="sugg-count-all">0</span>)</button>
                     <button class="sugg-chip chip-scalp" data-smode="SCALP">⚡ Scalp (<span id="sugg-count-scalp">0</span>)</button>
+                    <button class="sugg-chip chip-intraday" data-smode="INTRADAY" style="border-left: 3px solid #38bdf8;">🎯 Intraday (<span id="sugg-count-intraday">0</span>)</button>
                     <button class="sugg-chip chip-swing" data-smode="SWING">🌊 Swing (<span id="sugg-count-swing">0</span>)</button>
-                    <button class="sugg-chip chip-sniper" data-smode="SNIPER">🎯 Deep Sniper (<span id="sugg-count-sniper">0</span>)</button>
+                    <button class="sugg-chip chip-positional" data-smode="POSITIONAL" style="border-left: 3px solid #eab308;">🏛️ Positional (<span id="sugg-count-positional">0</span>)</button>
                     <span class="sugg-filter-stats" id="sugg-filter-stats" style="margin-left: auto; font-size: 11px; font-weight: 700; color: var(--accent-cyan);"></span>
                 </div>
                 
@@ -875,7 +877,7 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/chart-engine.js?v=6.0"></script>
-    <script src="js/app.js?v=6.0"></script>
+    <script src="js/chart-engine.js?v=6.1"></script>
+    <script src="js/app.js?v=6.1"></script>
 </body>
 </html>

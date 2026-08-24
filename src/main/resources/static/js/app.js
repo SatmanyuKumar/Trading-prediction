@@ -466,23 +466,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 8. Timeframe Selector
+    // 8. Timeframe & 4-Tier Strategy Mode Dynamic Coordination
     const tfBtns = document.querySelectorAll('#tf-selector .tf-btn');
+    const tradeModeBtns = document.querySelectorAll('#trade-mode-selector .trade-mode-btn');
+
+    const MODE_TIMEFRAMES = {
+        'SCALP': ['1m', '3m', '5m'],
+        'INTRADAY': ['15m', '30m', '1h'],
+        'SWING': ['4h', '1d'],
+        'POSITIONAL': ['1d']
+    };
+
+    function syncTimeframeModeUI(mode, tf) {
+        const allowedTfs = MODE_TIMEFRAMES[mode] || ['1m', '3m', '5m'];
+        tfBtns.forEach(btn => {
+            const btf = btn.getAttribute('data-tf');
+            if (allowedTfs.includes(btf)) {
+                btn.style.opacity = '1';
+                btn.style.filter = 'none';
+                btn.style.borderBottom = '2px solid var(--accent-cyan)';
+            } else {
+                btn.style.opacity = '0.4';
+                btn.style.filter = 'grayscale(100%)';
+                btn.style.borderBottom = 'none';
+            }
+        });
+    }
+
     tfBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            const selectedTf = btn.getAttribute('data-tf');
+            state.timeframe = selectedTf;
             tfBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            state.timeframe = btn.getAttribute('data-tf');
+
+            // Auto-detect and align matching trade mode
+            let targetMode = 'SCALP';
+            if (['1m', '3m', '5m'].includes(selectedTf)) targetMode = 'SCALP';
+            else if (['15m', '30m', '1h'].includes(selectedTf)) targetMode = 'INTRADAY';
+            else if (['4h'].includes(selectedTf)) targetMode = 'SWING';
+            else if (['1d'].includes(selectedTf)) targetMode = (state.tradeMode === 'POSITIONAL') ? 'POSITIONAL' : 'SWING';
+
+            state.tradeMode = targetMode;
+            tradeModeBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-tmode') === targetMode));
+            syncTimeframeModeUI(targetMode, selectedTf);
+
             if (state.mode === 'tv') {
                 const tvIntervalMap = {
-                    '1m': '1',
-                    '3m': '3',
-                    '5m': '5',
-                    '15m': '15',
-                    '30m': '30',
-                    '1h': '60',
-                    '4h': '240',
-                    '1d': 'D'
+                    '1m': '1', '3m': '3', '5m': '5', '15m': '15',
+                    '30m': '30', '1h': '60', '4h': '240', '1d': 'D'
                 };
                 const tvInt = tvIntervalMap[state.timeframe] || '1';
                 initTradingViewWidget(state.tvSymbol, tvInt);
@@ -491,16 +523,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 8b. Trade Mode Selector (⚡ Scalp vs 🌊 Swing)
-    const tradeModeBtns = document.querySelectorAll('#trade-mode-selector .trade-mode-btn');
+    // 8b. Trade Mode Selector (⚡ Scalp vs 🎯 Intraday vs 🌊 Swing vs 🏛️ Positional)
     tradeModeBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             tradeModeBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            state.tradeMode = btn.getAttribute('data-tmode') || 'SCALP';
+            const mode = btn.getAttribute('data-tmode') || 'SCALP';
+            state.tradeMode = mode;
+
+            // Auto-switch timeframe if outside allowed set for this mode
+            const allowed = MODE_TIMEFRAMES[mode] || ['1m', '3m', '5m'];
+            if (!allowed.includes(state.timeframe)) {
+                const defaultTf = allowed[0];
+                state.timeframe = defaultTf;
+                tfBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-tf') === defaultTf));
+            }
+            syncTimeframeModeUI(mode, state.timeframe);
             loadAnalysis();
         });
     });
+
+    // Initial sync
+    syncTimeframeModeUI(state.tradeMode || 'SCALP', state.timeframe || '1m');
 
     // 8c. Strategy Playbook Interactive Tabs
     const btnPlaybookScalp = document.getElementById('btn-playbook-scalp');
@@ -512,8 +556,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPlaybookTrigger = document.getElementById('btn-playbook-trigger');
     const chkTrailingSl = document.getElementById('chk-trailing-sl');
 
-    const btnPlaybookSniper = document.getElementById('btn-playbook-sniper');
-
     if (btnPlaybookScalp) {
         btnPlaybookScalp.addEventListener('click', () => {
             const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SCALP"]');
@@ -524,13 +566,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnPlaybookSwing) {
         btnPlaybookSwing.addEventListener('click', () => {
             const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SWING"]');
-            if (btn) btn.click();
-        });
-    }
-
-    if (btnPlaybookSniper) {
-        btnPlaybookSniper.addEventListener('click', () => {
-            const btn = document.querySelector('#trade-mode-selector .trade-mode-btn[data-tmode="SNIPER"]');
             if (btn) btn.click();
         });
     }
@@ -1152,10 +1187,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getNormalizedSuggMode(sugg) {
         if (!sugg) return 'SCALP';
-        const m = (sugg.mode || '').toUpperCase();
+        const m = (sugg.mode || sugg.strategyMode || '').toUpperCase();
         const type = (sugg.setupType || '').toUpperCase();
-        if (m === 'SNIPER' || type.includes('SNIPER') || type.includes('OTE')) return 'SNIPER';
-        if (m === 'SWING' || type.includes('SWING') || type.includes('MACRO')) return 'SWING';
+        if (m === 'POSITIONAL' || type.includes('POSITION') || type.includes('MACRO')) return 'POSITIONAL';
+        if (m === 'SWING' || type.includes('SWING')) return 'SWING';
+        if (m === 'INTRADAY' || type.includes('INTRADAY')) return 'INTRADAY';
         return 'SCALP';
     }
 
@@ -1181,28 +1217,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = state.suggestions || [];
         positionsTbody.innerHTML = '';
 
-        // 1. Calculate counts for each of the 3 separate sections
+        // 1. Calculate counts for each of the 4 separate sections
         const scalpList = list.filter(s => getNormalizedSuggMode(s) === 'SCALP');
+        const intradayList = list.filter(s => getNormalizedSuggMode(s) === 'INTRADAY');
         const swingList = list.filter(s => getNormalizedSuggMode(s) === 'SWING');
-        const sniperList = list.filter(s => getNormalizedSuggMode(s) === 'SNIPER');
+        const positionalList = list.filter(s => getNormalizedSuggMode(s) === 'POSITIONAL');
+
+        const suggCountIntraday = document.getElementById('sugg-count-intraday');
+        const suggCountPositional = document.getElementById('sugg-count-positional');
 
         if (suggCountAll) suggCountAll.textContent = list.length;
         if (suggCountScalp) suggCountScalp.textContent = scalpList.length;
+        if (suggCountIntraday) suggCountIntraday.textContent = intradayList.length;
         if (suggCountSwing) suggCountSwing.textContent = swingList.length;
-        if (suggCountSniper) suggCountSniper.textContent = sniperList.length;
+        if (suggCountPositional) suggCountPositional.textContent = positionalList.length;
 
         // 2. Select filtered dataset based on active filter chip
         let filteredList = list;
-        let modeLabel = 'All 3 Modes';
+        let modeLabel = 'All Modes';
         if (state.suggFilter === 'SCALP') {
             filteredList = scalpList;
-            modeLabel = '⚡ Scalp Mode';
+            modeLabel = '⚡ Scalp Mode (1m-5m)';
+        } else if (state.suggFilter === 'INTRADAY') {
+            filteredList = intradayList;
+            modeLabel = '🎯 Intraday Mode (15m-1h)';
         } else if (state.suggFilter === 'SWING') {
             filteredList = swingList;
-            modeLabel = '🌊 Swing Mode';
-        } else if (state.suggFilter === 'SNIPER') {
-            filteredList = sniperList;
-            modeLabel = '🎯 Deep Sniper Mode';
+            modeLabel = '🌊 Swing Mode (4h-1D)';
+        } else if (state.suggFilter === 'POSITIONAL') {
+            filteredList = positionalList;
+            modeLabel = '🏛️ Positional Mode (1D-1W)';
         }
 
         if (suggFilterStats) {
@@ -1252,10 +1296,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const normMode = getNormalizedSuggMode(sugg);
             
             let modeBadge = '<span class="mode-pill scalp" style="background:rgba(14,165,233,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">⚡ SCALP</span>';
-            if (normMode === 'SWING') {
+            if (normMode === 'INTRADAY') {
+                modeBadge = '<span class="mode-pill intraday" style="background:rgba(6,182,212,0.15); color:#22d3ee; border:1px solid rgba(6,182,212,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🎯 INTRADAY</span>';
+            } else if (normMode === 'SWING') {
                 modeBadge = '<span class="mode-pill swing" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🌊 SWING</span>';
-            } else if (normMode === 'SNIPER') {
-                modeBadge = '<span class="mode-pill sniper" style="background:rgba(234,179,8,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🎯 SNIPER</span>';
+            } else if (normMode === 'POSITIONAL') {
+                modeBadge = '<span class="mode-pill positional" style="background:rgba(234,179,8,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3); padding:2px 7px; border-radius:4px; font-size:10.5px; font-weight:800;">🏛️ POSITIONAL</span>';
             }
 
             let stateBadge = '<span class="status-badge breakeven">⏳ PENDING PULLBACK</span>';

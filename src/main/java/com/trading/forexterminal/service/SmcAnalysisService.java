@@ -631,14 +631,42 @@ public class SmcAnalysisService {
 
         double rsi14 = calculateRSI(candles, 14);
 
-        // Mode Parameters (⚡ SCALP vs 🌊 SWING vs 🎯 DEEP SNIPER for Small Capital)
-        boolean isSwing = "SWING".equalsIgnoreCase(tradeMode);
-        boolean isSniper = "SNIPER".equalsIgnoreCase(tradeMode) || "DEEP".equalsIgnoreCase(tradeMode);
+        // Mode Parameters (⚡ SCALP vs 🎯 INTRADAY vs 🌊 SWING vs 🏛️ POSITIONAL)
+        boolean isScalp = "SCALP".equalsIgnoreCase(tradeMode);
+        boolean isIntraday = "INTRADAY".equalsIgnoreCase(tradeMode);
+        boolean isPositional = "POSITIONAL".equalsIgnoreCase(tradeMode);
+        boolean isSwing = "SWING".equalsIgnoreCase(tradeMode) || (!isScalp && !isIntraday && !isPositional);
 
-        double atrMultiplier = isSwing ? 2.0 : (isSniper ? 0.85 : 1.3);
-        double tp1Multiplier = isSwing ? 3.5 : (isSniper ? 5.5 : 3.0); // Sniper targets healthy 1:5.5+
-        double tp2Multiplier = isSwing ? 5.0 : (isSniper ? 8.5 : 4.5);
-        double targetRr = isSwing ? 3.5 : (isSniper ? 5.5 : 3.0);
+        double atrMultiplier;
+        double tp1Multiplier;
+        double tp2Multiplier;
+        double targetRr;
+
+        if (isScalp) {
+            // ⚡ SCALP: Fast Micro Execution (1m, 3m, 5m | 1:1.8 R:R Quick Exit)
+            atrMultiplier = 1.0;
+            tp1Multiplier = 1.8;
+            tp2Multiplier = 2.5;
+            targetRr = 1.8;
+        } else if (isIntraday) {
+            // 🎯 INTRADAY: Session Momentum Expansion (15m, 30m, 1h | 1:2.8 R:R)
+            atrMultiplier = 1.4;
+            tp1Multiplier = 2.8;
+            tp2Multiplier = 4.0;
+            targetRr = 2.8;
+        } else if (isPositional) {
+            // 🏛️ POSITIONAL: Macro Structural Shift (1D | 1:7.5+ R:R)
+            atrMultiplier = 2.5;
+            tp1Multiplier = 7.5;
+            tp2Multiplier = 12.0;
+            targetRr = 7.5;
+        } else {
+            // 🌊 SWING: Multi-day Liquidity Sweeps (4h, 1D | 1:4.5 R:R)
+            atrMultiplier = 2.0;
+            tp1Multiplier = 4.5;
+            tp2Multiplier = 6.5;
+            targetRr = 4.5;
+        }
 
         // Timeframe Reliability Hierarchy
         String tfUpper = timeframe.toUpperCase();
@@ -650,12 +678,12 @@ public class SmcAnalysisService {
         };
         boolean isLtf = "1M".equalsIgnoreCase(tfUpper) || "3M".equalsIgnoreCase(tfUpper) || "5M".equalsIgnoreCase(tfUpper);
 
-        // Minimum Volatility Buffer per Asset Class (Extra safe breathing room on LTF 1m/3m to protect against broker spread & wick spikes)
+        // Minimum Volatility Buffer per Asset Class & Mode
         double minBuffer = switch (symbol.toUpperCase()) {
-            case "XAUUSD" -> isLtf ? 5.50 : (isSniper ? 4.50 : 3.50); // $5.50 minimum floor on LTF Gold (55 pips breathing room!)
-            case "BTCUSD" -> isLtf ? 180.0 : (isSniper ? 140.0 : 100.0); // $180 floor on Bitcoin
-            case "USDJPY" -> isLtf ? 0.30 : (isSniper ? 0.22 : 0.18); // 30 pips on Yen
-            default -> isLtf ? 0.00220 : (isSniper ? 0.00180 : 0.00150);   // 22 pips on EURUSD / GBPUSD
+            case "XAUUSD" -> isScalp ? 4.50 : (isIntraday ? 6.50 : (isPositional ? 15.0 : 9.0));
+            case "BTCUSD" -> isScalp ? 120.0 : (isIntraday ? 220.0 : (isPositional ? 600.0 : 350.0));
+            case "USDJPY" -> isScalp ? 0.20 : (isIntraday ? 0.28 : (isPositional ? 0.60 : 0.40));
+            default -> isScalp ? 0.00150 : (isIntraday ? 0.00220 : (isPositional ? 0.00550 : 0.00350));
         };
         double dynamicAtrBuffer = Math.max(minBuffer, atr14 * atrMultiplier);
 
@@ -729,59 +757,44 @@ public class SmcAnalysisService {
             double anchorWickHigh;
 
             // 1. Calculate genuine Structural Invalidation High & Protective Stop Loss
-            if (isSniper && nearestOverheadFvg != null) {
-                // 75% Deep OTE Tap into Supply FVG Ceiling
-                double gTop = nearestOverheadFvg.getTop();
-                double gBottom = nearestOverheadFvg.getBottom();
-                entry = round(gTop - ((gTop - gBottom) * 0.25), 5);
-                anchorWickHigh = gTop;
+            if (nearestOverheadFvg != null) {
+                entry = round(nearestOverheadFvg.getConsequentEncroachment(), 5);
+                anchorWickHigh = nearestOverheadFvg.getTop();
                 stopLoss = round(anchorWickHigh + dynamicAtrBuffer + spread, 5);
-            } else if (isSniper && nearestOverheadOb != null) {
-                double obTop = nearestOverheadOb.getTop();
-                double obBottom = nearestOverheadOb.getBottom();
-                entry = round(obTop - ((obTop - obBottom) * 0.25), 5);
-                anchorWickHigh = obTop;
+            } else if (nearestOverheadOb != null) {
+                entry = round(nearestOverheadOb.getBottom(), 5);
+                anchorWickHigh = nearestOverheadOb.getTop();
                 stopLoss = round(anchorWickHigh + dynamicAtrBuffer + spread, 5);
             } else {
                 entry = overheadSupplyLevel;
-                anchorWickHigh = nearestOverheadFvg != null 
-                    ? Math.max(nearestOverheadFvg.getTop(), rangeHigh) 
-                    : (nearestOverheadOb != null ? Math.max(nearestOverheadOb.getTop(), rangeHigh) : rangeHigh);
+                anchorWickHigh = rangeHigh;
                 stopLoss = round(anchorWickHigh + dynamicAtrBuffer + spread, 5);
             }
 
-            // 2. Risk Distance Calibrated for Scalp & Swing (Strictly 200 to 300 Pips)
-            double risk;
-            if (isSniper) {
-                risk = Math.max(minBuffer, Math.abs(stopLoss - entry));
-            } else {
-                double minPipDist = getPipDistance(symbol, isSwing ? 250.0 : 200.0);
-                double maxPipDist = getPipDistance(symbol, isSwing ? 300.0 : 250.0);
-                double rawRisk = Math.abs(stopLoss - entry);
-                risk = Math.max(minPipDist, Math.min(maxPipDist, rawRisk));
-            }
+            // 2. Risk Distance Calibrated for Mode
+            double minPipDist = getPipDistance(symbol, isScalp ? 120.0 : (isIntraday ? 200.0 : (isPositional ? 450.0 : 300.0)));
+            double maxPipDist = getPipDistance(symbol, isScalp ? 180.0 : (isIntraday ? 280.0 : (isPositional ? 750.0 : 450.0)));
+            double rawRisk = Math.abs(stopLoss - entry);
+            double risk = Math.max(minPipDist, Math.min(maxPipDist, rawRisk));
             stopLoss = round(entry + risk, 5);
 
             // 3. Dual Entry 2 (Structural Invalidation Inflection Level: 50%+ Bounce Probability Floor)
-            // Sits at the Structural High Ceiling (75-80% OTE Premium Retest). Above this, bounce chance drops drastically.
             entry2 = round(anchorWickHigh - spread, 5);
             if (entry2 <= entry || entry2 >= stopLoss) {
-                entry2 = round(entry + (risk * 0.60), 5); // 60% Deep Retest Level
+                entry2 = round(entry + (risk * 0.50), 5); // 50% Deep Retest Level
             }
 
-            // 4. Take Profit Targets (Preserve Full Macro Target / Range Low / Demand)
-            double fullDemandTarget = (nearestUnderneathFvg != null) ? nearestUnderneathFvg.getConsequentEncroachment() : underneathDemandLevel;
-            double macroTargetSell = Math.min(fullDemandTarget, rangeLow);
-            double minSniperTpSell = entry - (risk * tp1Multiplier);
-            double tp1 = round(isSniper ? minSniperTpSell : Math.min(macroTargetSell, minSniperTpSell), 5);
+            // 4. Take Profit Targets (Strictly calibrated by mode multiplier)
+            double tp1 = round(entry - (risk * tp1Multiplier), 5);
             double tp2 = round(entry - (risk * tp2Multiplier), 5);
-            double calculatedRr = round(Math.abs(entry - tp1) / risk, 1);
+            double calculatedRr = round(Math.abs(entry - tp1) / Math.max(0.001, risk), 1);
             double bufferApplied = Math.abs(stopLoss - anchorWickHigh);
 
-            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
+            confidence = (nearestOverheadFvg != null && isBearishTrend) ? (isScalp ? 92 : (isIntraday ? 94 : 96)) : 88;
 
+            String modeName = isScalp ? "⚡ Scalp (1:1.8 Quick Cashflow)" : (isIntraday ? "🎯 Intraday (1:2.8 Session Expansion)" : (isPositional ? "🏛️ Positional (1:7.5 Macro Trend)" : "🌊 Swing (1:4.5 Weekly Leg)"));
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-            confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Trend Continuation (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
+            confluences.add("Mode: " + modeName);
             confluences.add("🏛️ Institutional Delivery: Bearish Order Flow (" + (isBearishTrend ? "EMA 20 < 50 < 200 Waterfall" : "Supply Rejection") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural High @" + formatPrice(anchorWickHigh, symbol) + " + Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
             confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
@@ -789,9 +802,9 @@ public class SmcAnalysisService {
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Bearish Alignment)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Short)");
 
-            String setupTitle = isSniper
-                ? "🎯 Deep Sniper Short: 75% OTE Supply Retest (Safe Cushion SL 1:5.5+)"
-                : (isSwing ? "🎯 4H/Macro Bearish Trend: Supply Pullback (250-300 Pip Guard)" : "⚡ Scalp Supply Tap: High-Probability Short (200-250 Pip Guard)");
+            String setupTitle = isScalp
+                ? "⚡ Scalp Short: Fast Micro FVG Rejection (1:1.8 Quick Exit)"
+                : (isIntraday ? "🎯 Intraday Short: Session Supply Expansion (1:2.8 Target)" : (isPositional ? "🏛️ Positional Short: Macro Structural Distribution (1:7.5+ Target)" : "🌊 Swing Short: 4H/Daily Macro Supply Rejection (1:4.5 Target)"));
 
             String bookExplanation = String.format(
                 "### 📚 %s (ICT Bearish Order Flow Blueprint)\n\n" +
@@ -804,7 +817,7 @@ public class SmcAnalysisService {
                 "   SL is placed safely at **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
-                isSniper ? "🎯 Deep Sniper OTE Short Blueprint" : (isSwing ? "🌊 Macro Bearish Trend Blueprint" : "⚡ Intraday Supply Tap"),
+                setupTitle,
                 timeframe,
                 formatPrice(entry, symbol),
                 formatPrice(entry2, symbol),
@@ -844,59 +857,44 @@ public class SmcAnalysisService {
             double anchorWickLow;
 
             // 1. Calculate genuine Structural Invalidation Low & Protective Stop Loss
-            if (isSniper && nearestUnderneathFvg != null) {
-                // 75% Deep OTE Tap into Demand FVG Floor
-                double gTop = nearestUnderneathFvg.getTop();
-                double gBottom = nearestUnderneathFvg.getBottom();
-                entry = round(gBottom + ((gTop - gBottom) * 0.25) + spread, 5);
-                anchorWickLow = gBottom;
+            if (nearestUnderneathFvg != null) {
+                entry = round(nearestUnderneathFvg.getConsequentEncroachment() + spread, 5);
+                anchorWickLow = nearestUnderneathFvg.getBottom();
                 stopLoss = round(anchorWickLow - dynamicAtrBuffer, 5);
-            } else if (isSniper && nearestUnderneathOb != null) {
-                double obTop = nearestUnderneathOb.getTop();
-                double obBottom = nearestUnderneathOb.getBottom();
-                entry = round(obBottom + ((obTop - obBottom) * 0.25) + spread, 5);
-                anchorWickLow = obBottom;
+            } else if (nearestUnderneathOb != null) {
+                entry = round(nearestUnderneathOb.getTop() + spread, 5);
+                anchorWickLow = nearestUnderneathOb.getBottom();
                 stopLoss = round(anchorWickLow - dynamicAtrBuffer, 5);
             } else {
                 entry = underneathDemandLevel + spread;
-                anchorWickLow = nearestUnderneathFvg != null 
-                    ? Math.min(nearestUnderneathFvg.getBottom(), rangeLow) 
-                    : (nearestUnderneathOb != null ? Math.min(nearestUnderneathOb.getBottom(), rangeLow) : rangeLow);
+                anchorWickLow = rangeLow;
                 stopLoss = round(anchorWickLow - dynamicAtrBuffer, 5);
             }
 
-            // 2. Risk Distance Calibrated for Scalp & Swing (Strictly 200 to 300 Pips)
-            double risk;
-            if (isSniper) {
-                risk = Math.max(minBuffer, Math.abs(entry - stopLoss));
-            } else {
-                double minPipDist = getPipDistance(symbol, isSwing ? 250.0 : 200.0);
-                double maxPipDist = getPipDistance(symbol, isSwing ? 300.0 : 250.0);
-                double rawRisk = Math.abs(entry - stopLoss);
-                risk = Math.max(minPipDist, Math.min(maxPipDist, rawRisk));
-            }
+            // 2. Risk Distance Calibrated for Mode
+            double minPipDist = getPipDistance(symbol, isScalp ? 120.0 : (isIntraday ? 200.0 : (isPositional ? 450.0 : 300.0)));
+            double maxPipDist = getPipDistance(symbol, isScalp ? 180.0 : (isIntraday ? 280.0 : (isPositional ? 750.0 : 450.0)));
+            double rawRisk = Math.abs(entry - stopLoss);
+            double risk = Math.max(minPipDist, Math.min(maxPipDist, rawRisk));
             stopLoss = round(entry - risk, 5);
 
             // 3. Dual Entry 2 (Structural Invalidation Inflection Level: 50%+ Bounce Probability Floor)
-            // Sits at the Structural Low Base (75-80% OTE Demand Retest). Below this, bounce chance drops drastically.
             entry2 = round(anchorWickLow + spread, 5);
             if (entry2 >= entry || entry2 <= stopLoss) {
-                entry2 = round(entry - (risk * 0.60), 5); // 60% Deep Retest Level
+                entry2 = round(entry - (risk * 0.50), 5); // 50% Deep Retest Level
             }
 
-            // 4. Take Profit Targets (1:5.5+ Asymmetric Expansion)
-            double fullSupplyTarget = (nearestOverheadFvg != null) ? nearestOverheadFvg.getConsequentEncroachment() : overheadSupplyLevel;
-            double macroTargetBuy = Math.max(fullSupplyTarget, rangeHigh);
-            double minSniperTpBuy = entry + (risk * tp1Multiplier);
-            double tp1 = round(isSniper ? minSniperTpBuy : Math.max(macroTargetBuy, minSniperTpBuy), 5);
+            // 4. Take Profit Targets (Strictly calibrated by mode multiplier)
+            double tp1 = round(entry + (risk * tp1Multiplier), 5);
             double tp2 = round(entry + (risk * tp2Multiplier), 5);
-            double calculatedRr = round(Math.abs(tp1 - entry) / risk, 1);
+            double calculatedRr = round(Math.abs(tp1 - entry) / Math.max(0.001, risk), 1);
             double bufferApplied = Math.abs(anchorWickLow - stopLoss);
 
-            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isSniper ? 94 : (isSwing ? 96 : 92)) : (isSwing ? 90 : 86);
+            confidence = (nearestUnderneathFvg != null && isBullishTrend) ? (isScalp ? 92 : (isIntraday ? 94 : 96)) : 88;
 
+            String modeName = isScalp ? "⚡ Scalp (1:1.8 Quick Cashflow)" : (isIntraday ? "🎯 Intraday (1:2.8 Session Expansion)" : (isPositional ? "🏛️ Positional (1:7.5 Macro Trend)" : "🌊 Swing (1:4.5 Weekly Leg)"));
             confluences.add("Timeframe Reliability: " + tfReliabilityTag);
-            confluences.add("Mode: " + (isSniper ? "🎯 Deep Sniper / Small Capital OTE Mode (Healthy Cushion)" : (isSwing ? "🌊 Swing / Macro Bullish Expansion (250-300 Pip SL Guard)" : "⚡ Scalp / Intraday Momentum (200-250 Pip SL Guard)")));
+            confluences.add("Mode: " + modeName);
             confluences.add("🏛️ Institutional Delivery: Bullish Order Flow (" + (isBullishTrend ? "EMA 20 > 50 > 200 Expansion" : "Demand Mitigation") + ")");
             confluences.add("🛡️ Invalidation Anchor: Structural Low @" + formatPrice(anchorWickLow, symbol) + " - Buffer ➔ Real SL: " + formatPrice(stopLoss, symbol) + " (" + String.format("%.0f", calculatePips(symbol, risk)) + " Pips)");
             confluences.add("🎯 Primary Entry: " + formatPrice(entry, symbol) + " | 🟢 High-Prob Inflection E2: " + formatPrice(entry2, symbol));
@@ -904,9 +902,9 @@ public class SmcAnalysisService {
             confluences.add("RSI Momentum: RSI=" + String.format("%.1f", rsi14) + " (Clean Bullish Momentum)");
             confluences.add("Target Risk-to-Reward: 1:" + calculatedRr + " (Strategic Asymmetric Expectancy)");
 
-            String setupTitle = isSniper
-                ? "🎯 Deep Sniper Long: 75% OTE Demand Retest (Safe Cushion SL 1:5.5+)"
-                : (isSwing ? "🚀 4H/Macro Bullish Expansion: Demand Pullback (250-300 Pip Guard)" : "⚡ Scalp Demand Tap: Rapid Push (200-250 Pip Guard)");
+            String setupTitle = isScalp
+                ? "⚡ Scalp Long: Fast Micro FVG Bounce (1:1.8 Quick Exit)"
+                : (isIntraday ? "🎯 Intraday Long: Session Demand Expansion (1:2.8 Target)" : (isPositional ? "🏛️ Positional Long: Macro Structural Accumulation (1:7.5+ Target)" : "🌊 Swing Long: 4H/Daily Macro Demand Reversal (1:4.5 Target)"));
 
             String bookExplanation = String.format(
                 "### 📚 %s (ICT OTE & Bullish Expansion Blueprint)\n\n" +
@@ -919,7 +917,7 @@ public class SmcAnalysisService {
                 "   SL is placed safely below **%s** maintaining a **%s Pip protective boundary** ➔ True Hard SL at **%s**.\n\n" +
                 "4. **Target Horizons:**\n" +
                 "   Take Profit 1 at **%s** (Overhead Target) and Take Profit 2 at **%s** yielding an asymmetric **1:%.1f R:R**.\n",
-                isSniper ? "🎯 Deep Sniper OTE Long Blueprint" : (isSwing ? "🌊 Macro Bullish Expansion Blueprint" : "⚡ Intraday Demand Expansion"),
+                setupTitle,
                 timeframe,
                 overheadSupplyLevel > 0 ? formatPrice(overheadSupplyLevel, symbol) : "Target Liquidity",
                 formatPrice(entry, symbol),
